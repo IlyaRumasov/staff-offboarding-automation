@@ -1,0 +1,598 @@
+{
+  "name": "[PROD] Redmine & AD Offboarding Automation (Admin Staff) / [PROD] Автоматизація звільнення (Адмін персонал)",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 18 * * *"
+            }
+          ]
+        }
+      },
+      "id": "08aa6093-d2ae-4aac-9bc7-d3d5123f49d7",
+      "name": "Schedule: Weekdays 09:00",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        2816,
+        1744
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "filters": {
+          "project_id": "staff-leavers",
+          "status_id": "open",
+          "tracker_id": "25"
+        },
+        "options": {}
+      },
+      "id": "5dd93abb-189a-4cd4-8589-93c750a7011c",
+      "name": "Redmine: Get Leaver Tickets",
+      "type": "n8n-nodes-redmine.redmine",
+      "typeVersion": 1,
+      "position": [
+        3040,
+        1744
+      ],
+      "credentials": {
+        "redmineApi": {
+          "id": "8iS6GePvGFXR3dlv",
+          "name": "Redmine bot account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const results = [];\nconst inputItems = $input.all();\nlet itemsToProcess = [];\n\nif (inputItems.length > 0 && inputItems[0].json.issues && Array.isArray(inputItems[0].json.issues)) {\n    itemsToProcess = inputItems[0].json.issues;\n} else {\n    itemsToProcess = inputItems.map(i => i.json);\n}\n\n// Получаем сегодняшнюю дату в формате YYYY-MM-DD\nconst today = new Date().toISOString().split('T')[0];\n\nfor (const issue of itemsToProcess) {\n    if (!issue) continue;\n\n    // --- НОВЫЙ БЛОК: Ищем кастомное поле Termination date (ID 30) ---\n    const termDateObj = (issue.custom_fields || []).find(f => f.id === 30);\n    const termDate = termDateObj && termDateObj.value ? termDateObj.value : null;\n\n    // ВАЖНО: Теперь приоритет у Termination date. \n    // Если пусто — fallback на due_date, если и там пусто — на start_date или today.\n    const leaverDate = termDate || issue.due_date || issue.start_date || today; \n    // -----------------------------------------------------------------\n\n    // Если дата увольнения больше сегодняшней (человек увольняется в будущем) — пропускаем!\n    if (leaverDate > today) {\n        continue; \n    }\n\n    const description = issue.description || \"\";\n    \n    // 1. Вытягиваем email для переадресации\n    const emailMatch = description.match(/Переадресація (?:пошти|диску):\\s*([a-zA-Z0-9._-]+@[a-zA-Z0-9._-]+\\.[a-zA-Z0-9_-]+)/i);\n    const newOwnerEmail = emailMatch ? emailMatch[1].trim() : '';\n\n    // 2. Получаем ФИО\n    const contractorEngObj = (issue.custom_fields || []).find(f => f.id === 11);\n    const contractorEng = contractorEngObj ? contractorEngObj.value.trim() : '';\n\n    const contractorUkrObj = (issue.custom_fields || []).find(f => f.id === 103);\n    const contractorUkr = contractorUkrObj ? contractorUkrObj.value.trim() : '';\n\n    let firstName = '';\n    let lastName = '';\n    let possibleLogins = [];\n\n    // 3. Генерируем логины\n    if (contractorEng) {\n        const nameParts = contractorEng.split(/\\s+/);\n        if (nameParts.length >= 2) {\n            firstName = nameParts[0].toLowerCase();\n            lastName = nameParts[nameParts.length - 1].toLowerCase();\n\n            possibleLogins = [\n                `${firstName}.${lastName}`,\n                `${lastName}.${firstName}`,\n                `${firstName[0]}.${lastName}`,\n                `${firstName[0]}${lastName}`,\n                `${firstName}${lastName[0]}`\n            ];\n        }\n    }\n\n    // 4. Формируем финальный объект\n    if (firstName && lastName) {\n        results.push({\n            json: {\n                ticket_id: issue.id,\n                contractor_eng: contractorEng,\n                contractor_ukr: contractorUkr,\n                first_name: firstName,\n                last_name: lastName,\n                primary_guess_email: `${firstName}.${lastName}@corp.example.com`,\n                possible_logins: possibleLogins,\n                new_owner_email: newOwnerEmail,\n                leaver_date: leaverDate // Передаем проверенную дату завершения\n            }\n        });\n    }\n}\n\nreturn results;"
+      },
+      "id": "1ae0ce59-cfb5-44e5-8447-fc4bb9433247",
+      "name": "Code: Parse & Filter Leavers",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3264,
+        1744
+      ]
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        3488,
+        1744
+      ],
+      "id": "986ef700-5b0e-42d5-9749-8df05770e4f3",
+      "name": "Loop: Process Each Leaver"
+    },
+    {
+      "parameters": {
+        "baseDN": "OU=administrative_staff,OU=AllUsers,OU=COMPANY,DC=example,DC=com",
+        "searchFor": "custom",
+        "customFilter": "=(&(objectClass=user)(|{{ $json.possible_logins.map(l => '(sAMAccountName=' + l + ')').join('') }}))",
+        "returnAll": true,
+        "options": {
+          "scope": "sub"
+        }
+      },
+      "id": "21e78122-cc88-4b3c-b5a7-1330f1471aaf",
+      "name": "LDAP: Search User DN",
+      "type": "n8n-nodes-base.ldap",
+      "typeVersion": 1,
+      "position": [
+        3712,
+        1680
+      ],
+      "credentials": {
+        "ldap": {
+          "id": "t9XqtE9WrUDZa8K8",
+          "name": "LDAP service account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{ $input.all().length }}",
+              "operation": "equal",
+              "value2": 1
+            }
+          ]
+        }
+      },
+      "id": "82f7eb6d-f05b-43cf-92fa-cdd3e572f8bc",
+      "name": "If: Exact AD Match?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        3936,
+        1680
+      ]
+    },
+    {
+      "parameters": {
+        "executeOnce": false,
+        "command": "=echo -e \"dn: {{ $json.dn }}\\nchangetype: modify\\nreplace: userAccountControl\\nuserAccountControl: 514\\n\\ndn: {{ $json.dn }}\\nchangetype: modrdn\\nnewrdn: {{ $json.dn.split(',')[0] }}\\ndeleteoldrdn: 1\\nnewsuperior: OU=Уволенные,DC=example,DC=com\" | LDAPTLS_REQCERT=never ldapmodify -H ldaps://<AD_LDAPS_HOST>:636 -D \"service_n8n@example.com\" -w \"<AD_SERVICE_PASSWORD>\""
+      },
+      "id": "f24407e7-4ca8-4726-a7a1-21ff1c86639f",
+      "name": "CLI: Disable & Move AD Account",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        4160,
+        1600
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "userId": {
+          "__rl": true,
+          "value": "={{ $('Code: Parse & Filter Leavers').item.json.primary_guess_email }}",
+          "mode": "userEmail"
+        },
+        "updateFields": {
+          "suspendUi": true
+        }
+      },
+      "id": "4c0f44e0-2072-4415-8218-1376d0949209",
+      "name": "Google: Suspend Account",
+      "type": "n8n-nodes-base.gSuiteAdmin",
+      "typeVersion": 1,
+      "position": [
+        4384,
+        1680
+      ],
+      "credentials": {
+        "gSuiteAdminOAuth2Api": {
+          "id": "SHnoQKgRMccdxfrR",
+          "name": "Google Workspace Admin account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "userId": {
+          "__rl": true,
+          "value": "={{ $('Loop: Process Each Leaver').item.json.new_owner_email }}",
+          "mode": "userEmail"
+        }
+      },
+      "id": "98b3c543-a247-43a3-a2d3-16aa342346f1",
+      "name": "Google: Get Manager ID",
+      "type": "n8n-nodes-base.gSuiteAdmin",
+      "typeVersion": 1,
+      "position": [
+        4608,
+        1680
+      ],
+      "credentials": {
+        "gSuiteAdminOAuth2Api": {
+          "id": "SHnoQKgRMccdxfrR",
+          "name": "Google Workspace Admin account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://admin.googleapis.com/admin/datatransfer/v1/transfers",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleOAuth2Api",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"oldOwnerUserId\": \"{{ $('Google: Suspend Account').item.json.id }}\",\n  \"newOwnerUserId\": \"{{ $('Google: Get Manager ID').item.json.id }}\",\n  \"applicationDataTransfers\": [\n    {\n      \"applicationId\": \"55656082996\",\n      \"applicationTransferParams\": [\n        {\n          \"key\": \"PRIVACY_LEVEL\",\n          \"value\": [\"SHARED\", \"PRIVATE\"]\n        }\n      ]\n    }\n  ]\n}",
+        "options": {}
+      },
+      "id": "adf3b206-b791-4dea-981f-bfafd4cb2e5d",
+      "name": "HTTP: Transfer Google Drive",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        4832,
+        1680
+      ],
+      "credentials": {
+        "googleOAuth2Api": {
+          "id": "LnLpyTMCxz8ITAgf",
+          "name": "Google account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "filter": "=startswith(givenName, '{{ $('Loop: Process Each Leaver').item.json.first_name }}') and startswith(surname, '{{ $('Loop: Process Each Leaver').item.json.last_name }}')",
+        "requestOptions": {}
+      },
+      "id": "1fd6345a-8848-488e-8102-48e5c4826d55",
+      "name": "Entra ID: Search User",
+      "type": "n8n-nodes-base.microsoftEntra",
+      "typeVersion": 1,
+      "position": [
+        5056,
+        1680
+      ],
+      "alwaysOutputData": true,
+      "credentials": {
+        "microsoftEntraOAuth2Api": {
+          "id": "NmYfmks4wP0HXAhY",
+          "name": "Microsoft Entra ID (Azure Active Directory) account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "66fb39f3-f3fb-42ce-b1b0-72d204efb2db",
+              "leftValue": "={{ $json.id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        5280,
+        1680
+      ],
+      "id": "d19ac25c-b5fc-408e-aaa7-96645da118d4",
+      "name": "If: M365 Account Found?"
+    },
+    {
+      "parameters": {
+        "operation": "delete",
+        "user": {
+          "__rl": true,
+          "value": "={{ $json.id }}",
+          "mode": "id"
+        },
+        "requestOptions": {}
+      },
+      "id": "c668ee76-b848-41f4-b186-33349a4c27d5",
+      "name": "Entra ID: Delete Account",
+      "type": "n8n-nodes-base.microsoftEntra",
+      "typeVersion": 1,
+      "position": [
+        5504,
+        1744
+      ],
+      "credentials": {
+        "microsoftEntraOAuth2Api": {
+          "id": "NmYfmks4wP0HXAhY",
+          "name": "Microsoft Entra ID (Azure Active Directory) account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "issueId": "={{ $('Loop: Process Each Leaver').item.json.ticket_id }}",
+        "notes": "= Автоматичний Offboarding успішно завершено!\n\n Детальний звіт про закриття доступів:\n\n1. Active Directory:\n   • Логін: {{ $('Loop: Process Each Leaver').item.json.first_name }}.{{ $('Loop: Process Each Leaver').item.json.last_name }}\n   • Статус: Акаунт заблоковано та переміщено в OU \"Уволенные\".\n\n2. Google Workspace:\n   • Акаунт: {{ $('Loop: Process Each Leaver').item.json.primary_guess_email }}\n   • Статус: Призупинено (Suspended).\n\n3. Google Диск (Перенесення документів):\n   • Передано з: {{ $('Loop: Process Each Leaver').item.json.primary_guess_email }}\n   • Новий власник (керівник): {{ $('Loop: Process Each Leaver').item.json.new_owner_email }}\n   • Статус: Успішно ініційовано системою.\n\n4.Microsoft 365:\n   • Знайдений акаунт: {{ $('Entra ID: Search User').item.json.userPrincipalName || $('Entra ID: Search User').item.json.mail || 'Акаунт відсутній' }}\n   • Статус: {{ $('Entra ID: Search User').item.json.id ? 'Успішно видалено з системи' : 'Видалення не потрібне (акаунт не існував)' }}",
+        "additionalFields": {
+          "status_id": "17"
+        },
+        "options": {}
+      },
+      "id": "20b7e149-9bde-4b9f-8644-08af89e24caf",
+      "name": "Redmine: Close Ticket & Add Note",
+      "type": "n8n-nodes-redmine.redmine",
+      "typeVersion": 1,
+      "position": [
+        5728,
+        1680
+      ],
+      "credentials": {
+        "redmineApi": {
+          "id": "8iS6GePvGFXR3dlv",
+          "name": "Redmine bot account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "<ARCHIVE_SHEET_ID>",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Аркуш1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/<ARCHIVE_SHEET_ID>/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Date": "={{ $now.format('yyyy-MM-dd HH:mm') }}",
+            "Login": "={{ $('Loop: Process Each Leaver').item.json.primary_guess_email }}",
+            "Ticket ID": "={{ $('Loop: Process Each Leaver').item.json.ticket_id }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Date",
+              "displayName": "Date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Login",
+              "displayName": "Login",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Ticket ID",
+              "displayName": "Ticket ID",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "d882fb99-0532-4103-a3fe-44f27b9660ab",
+      "name": "Google Sheets: Log to Archive",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [
+        5952,
+        1744
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "y6aKYpMxzALrNiNr",
+          "name": "Google Sheets account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Schedule: Weekdays 09:00": {
+      "main": [
+        [
+          {
+            "node": "Redmine: Get Leaver Tickets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Redmine: Get Leaver Tickets": {
+      "main": [
+        [
+          {
+            "node": "Code: Parse & Filter Leavers",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code: Parse & Filter Leavers": {
+      "main": [
+        [
+          {
+            "node": "Loop: Process Each Leaver",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop: Process Each Leaver": {
+      "main": [
+        [],
+        [
+          {
+            "node": "LDAP: Search User DN",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "LDAP: Search User DN": {
+      "main": [
+        [
+          {
+            "node": "If: Exact AD Match?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If: Exact AD Match?": {
+      "main": [
+        [
+          {
+            "node": "CLI: Disable & Move AD Account",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Google: Suspend Account",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CLI: Disable & Move AD Account": {
+      "main": [
+        [
+          {
+            "node": "Google: Suspend Account",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google: Suspend Account": {
+      "main": [
+        [
+          {
+            "node": "Google: Get Manager ID",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google: Get Manager ID": {
+      "main": [
+        [
+          {
+            "node": "HTTP: Transfer Google Drive",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP: Transfer Google Drive": {
+      "main": [
+        [
+          {
+            "node": "Entra ID: Search User",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Entra ID: Search User": {
+      "main": [
+        [
+          {
+            "node": "If: M365 Account Found?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If: M365 Account Found?": {
+      "main": [
+        [
+          {
+            "node": "Entra ID: Delete Account",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Redmine: Close Ticket & Add Note",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Entra ID: Delete Account": {
+      "main": [
+        [
+          {
+            "node": "Redmine: Close Ticket & Add Note",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Redmine: Close Ticket & Add Note": {
+      "main": [
+        [
+          {
+            "node": "Google Sheets: Log to Archive",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Sheets: Log to Archive": {
+      "main": [
+        [
+          {
+            "node": "Loop: Process Each Leaver",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "d22b0e68-092d-4ced-acaa-422b3d2edc7a",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "63e122c115184f3f8f2daad9145294ae571d4fa03ee655c15728a0caa803997e"
+  },
+  "nodeGroups": [],
+  "id": "Xf7HOSYqD1fjr45s",
+  "tags": [
+    {
+      "updatedAt": "2026-07-29T13:06:47.300Z",
+      "createdAt": "2026-07-29T13:06:47.300Z",
+      "id": "8nrJmEcdZlpafkkF",
+      "name": "Redmine"
+    }
+  ]
+}

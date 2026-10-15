@@ -1,0 +1,340 @@
+{
+  "name": "[PROD] Redmine & AD Offboarding Automation (Linear Staff)",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 10 * * 1-5"
+            }
+          ]
+        }
+      },
+      "id": "8bd727b8-9f01-424e-90b5-07fbd1b2f158",
+      "name": "[Cron] Trigger Offboarding Job",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        1856,
+        1392
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "filters": {
+          "issue_id": ""
+        },
+        "options": {}
+      },
+      "id": "7f2cf73b-52de-4929-820a-7b40c6de198c",
+      "name": "[Redmine] Fetch Leaver Tasks",
+      "type": "n8n-nodes-redmine.redmine",
+      "typeVersion": 1,
+      "position": [
+        2080,
+        1392
+      ],
+      "credentials": {
+        "redmineApi": {
+          "id": "8iS6GePvGFXR3dlv",
+          "name": "Redmine bot account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const results = [];\nconst today = new Date();\ntoday.setHours(0,0,0,0);\n\nconst inputItems = $input.all();\nlet itemsToProcess = [];\n\nif (inputItems.length === 1 && inputItems[0].json.issues && Array.isArray(inputItems[0].json.issues)) {\n    itemsToProcess = inputItems[0].json.issues;\n} else {\n    itemsToProcess = inputItems.map(i => i.json);\n}\n\nfor (const issue of itemsToProcess) {\n  if (!issue || !issue.tracker) continue;\n  if (issue.tracker.id !== 41) continue;\n\n  const description = issue.description || \"\";\n  const subject = issue.subject || \"\";\n  const id = issue.id;\n\n  const adMatch = description.match(/AD\\s*-\\s*([^\\n\\r]*)/i);\n  \n  let dateStr = null;\n  const dateMatch1 = subject.match(/(\\d{4}-\\d{2}-\\d{2})\\s*$/);\n  const dateMatch2 = subject.match(/\\|\\s*(\\d{4}-\\d{2}-\\d{2})\\s*$/);\n\n  if (dateMatch1) dateStr = dateMatch1[1];\n  else if (dateMatch2) dateStr = dateMatch2[1];\n\n  if (adMatch && dateStr) {\n    const login = adMatch[1].trim();\n    const leaverDate = new Date(dateStr);\n    leaverDate.setHours(0,0,0,0);\n\n    if (leaverDate < today) {\n      results.push({\n        json: {\n          id: id,\n          login: login,\n          leaver_date: dateStr,\n          subject: subject\n        }\n      });\n    }\n  }\n}\n\nreturn results;"
+      },
+      "id": "0d0c224d-fa7b-4894-aa43-5b57a941b484",
+      "name": "Script: Filter Overdue Users",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2304,
+        1392
+      ]
+    },
+    {
+      "parameters": {
+        "baseDN": "OU=AllUsers,OU=COMPANY,DC=example,DC=com",
+        "searchFor": "custom",
+        "customFilter": "=(&(objectClass=user)(sAMAccountName={{ $json.login }}))",
+        "returnAll": true,
+        "options": {
+          "scope": "sub"
+        }
+      },
+      "id": "48995f42-153a-46c0-90d6-a3a440bb2b98",
+      "name": "[LDAP] Search User DN",
+      "type": "n8n-nodes-base.ldap",
+      "typeVersion": 1,
+      "position": [
+        2528,
+        1392
+      ],
+      "credentials": {
+        "ldap": {
+          "id": "t9XqtE9WrUDZa8K8",
+          "name": "LDAP service account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.dn }}",
+              "operation": "isNotEmpty"
+            }
+          ]
+        }
+      },
+      "id": "21415711-c5df-466d-adde-c9f156da5001",
+      "name": "If: User DN Found?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        2752,
+        1392
+      ]
+    },
+    {
+      "parameters": {
+        "executeOnce": false,
+        "command": "=echo -e \"dn: {{ $json.dn }}\\nchangetype: modify\\nreplace: userAccountControl\\nuserAccountControl: 514\\n\\ndn: {{ $json.dn }}\\nchangetype: modrdn\\nnewrdn: {{ $json.dn.split(',')[0] }}\\ndeleteoldrdn: 1\\nnewsuperior: OU=Уволенные,DC=example,DC=com\" | LDAPTLS_REQCERT=never ldapmodify -H ldaps://<AD_LDAPS_HOST>:636 -D \"service_n8n@example.com\" -w \"<AD_SERVICE_PASSWORD>\""
+      },
+      "id": "463d0e24-6826-4a67-974b-849b9f6cb598",
+      "name": "[AD] Disable & Move Account",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        2976,
+        1392
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "<ARCHIVE_SHEET_ID>",
+          "mode": "list"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Date": "={{ $('Script: Filter Overdue Users').item.json.leaver_date }}",
+            "Login": "={{ $('Script: Filter Overdue Users').item.json.login }}",
+            "Ticket ID": "={{ $('Script: Filter Overdue Users').item.json.id }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Date",
+              "displayName": "Date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Login",
+              "displayName": "Login",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Ticket ID",
+              "displayName": "Ticket ID",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "1a8c449f-e13b-4c36-9405-c401c1312248",
+      "name": "Log Leaver to Archive",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [
+        3200,
+        1392
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "y6aKYpMxzALrNiNr",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "issueId": "={{ $('Script: Filter Overdue Users').item.json.id }}",
+        "notes": "Заборгованості по техніці немає. Акаунт у домені деактивовано та переміщено.",
+        "additionalFields": {
+          "status_id": "17"
+        },
+        "options": {}
+      },
+      "id": "21d5bf4e-e38c-4396-afad-a244ea5a9fe0",
+      "name": "[Redmine] Update Assignee",
+      "type": "n8n-nodes-redmine.redmine",
+      "typeVersion": 1,
+      "position": [
+        3424,
+        1392
+      ],
+      "credentials": {
+        "redmineApi": {
+          "id": "8iS6GePvGFXR3dlv",
+          "name": "Redmine bot account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "## 🛡️ [PROD] Автоматизація Offboarding (Linear Staff)\nАвтоматична деактивація акаунтів, архівування та закриття тікетів\n\n---\n\n### ⏰ Тригер\n* **Розклад:** Щодня о 10:00 (Пн-Пт) через Cron Schedule.\n\n### 🔍 Логіка обробки\n1. **Redmine Fetch:** Збір задач (ID трекера 41).\n2. **JS Filter:** Парсинг AD-логіна та фільтрація задач, де дата звільнення вже настала (`leaverDate < today`).\n3. **LDAP Search:** Пошук точного Distinguished Name (DN) в `OU=AllUsers`.\n4. **IF Check:** Перевірка існування знайденого DN (захист від виконання команд на порожніх даних).\n\n### ⚙️ Послідовність виконання\n1. **AD Action:** Блокування (514) та перенесення в `OU=Уволенные` через `ldapmodify` (обробка масивом).\n2. **Google Sheets:** Логування звільнення в архів (Дата, Логін, ID задачі).\n3. **Redmine (Resolve):** Одночасне додавання коментаря та закриття тікета (Status 17) від імені бота. Поле Assignee не змінюється.\n\n### 🔒 Технічні особливості\n* **Мережа:** З'єднання з AD через **LDAPS (порт 636)** із вимкненою перевіркою самопідписаних сертифікатів (`LDAPTLS_REQCERT=never`).\n* **Безпека:** Об'єкти в AD не видаляються, а виключно деактивуються. Пароль системного акаунта AD локально інтегровано в команду `Execute Command`.\n* **Оптимізація API:** Воркфлоу автоматично ітерує масиви. Зайві вузли затримки (Wait) видалено завдяки об'єднанню оновлення та закриття тікета Redmine в єдиний запит.",
+        "height": 770,
+        "width": 700,
+        "color": 6
+      },
+      "id": "233d61a3-0407-4304-887f-5befbc5bc4b1",
+      "name": "Sticky Note1",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        2336,
+        464
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "[Cron] Trigger Offboarding Job": {
+      "main": [
+        [
+          {
+            "node": "[Redmine] Fetch Leaver Tasks",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "[Redmine] Fetch Leaver Tasks": {
+      "main": [
+        [
+          {
+            "node": "Script: Filter Overdue Users",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Script: Filter Overdue Users": {
+      "main": [
+        [
+          {
+            "node": "[LDAP] Search User DN",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "[LDAP] Search User DN": {
+      "main": [
+        [
+          {
+            "node": "If: User DN Found?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If: User DN Found?": {
+      "main": [
+        [
+          {
+            "node": "[AD] Disable & Move Account",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "[AD] Disable & Move Account": {
+      "main": [
+        [
+          {
+            "node": "Log Leaver to Archive",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Leaver to Archive": {
+      "main": [
+        [
+          {
+            "node": "[Redmine] Update Assignee",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "[Redmine] Update Assignee": {
+      "main": [
+        []
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false,
+    "timeSavedMode": "fixed",
+    "errorWorkflow": "K6UWuL5wvzFf9VmD",
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "versionId": "7e9230eb-adb1-4188-bee8-e1aa8655dde1",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "63e122c115184f3f8f2daad9145294ae571d4fa03ee655c15728a0caa803997e"
+  },
+  "nodeGroups": [],
+  "id": "LJskdpubIlYPfFD4",
+  "tags": [
+    {
+      "updatedAt": "2026-07-29T13:06:47.300Z",
+      "createdAt": "2026-07-29T13:06:47.300Z",
+      "id": "8nrJmEcdZlpafkkF",
+      "name": "Redmine"
+    }
+  ]
+}
