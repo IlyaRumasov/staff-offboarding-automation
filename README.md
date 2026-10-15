@@ -1,5 +1,12 @@
 # Staff Offboarding: автоматичне закриття доступів при звільненні
 
+> **English summary.** Two n8n workflows that offboard staff from Redmine tickets: they find the person in Active Directory,
+> Google Workspace and Microsoft 365 **by name** (never by a guessed login), act only on a single unambiguous match, disable access,
+> transfer the Google Drive, and write a report into the ticket (what was checked, the result, what to do next). Anything ambiguous
+> is left to a human with an explanatory comment. No passwords in the flows, 39 + 28 test scenarios, v1 -> v2 history kept in `archive/v1`.
+> The rest of this README is in Ukrainian. Licensed under MIT.
+
+
 Два флоу n8n, які щодня читають заявки на звільнення з Redmine, знаходять людину в Active Directory,
 Google Workspace і Microsoft 365, закривають доступи й пишуть у заявку звіт про те, що саме зроблено.
 Якщо чогось бракує або щось неоднозначне, флоу **нічого не змінює**, а залишає в заявці коментар
@@ -237,3 +244,7 @@ docs/        скриншоти флоу
 - Перевірка техніки ґрунтується на коментарі IT у заявці; планується підключити GLPI (облік техніки), щоб флоу
   сам писав, що саме числиться за людиною.
 - Рядки статусів (17 = Resolved), id трекерів і полів прив'язані до конкретного Redmine.
+
+## Ліцензія
+
+MIT, див. файл `LICENSE`.
