@@ -1,0 +1,2825 @@
+[
+ {
+  "name": "регресія 13.10: порожній «AD -» -> знайдено в AD за ПІБ (єдиний збіг), обробка",
+  "stubs": {
+   "[Redmine] Get Open Leaver Tickets": [
+    {
+     "issues": [
+      {
+       "id": 50462,
+       "tracker": {
+        "id": 41,
+        "name": "GA | Leaver"
+       },
+       "status": {
+        "id": 1,
+        "name": "New"
+       },
+       "subject": "GA | Leaver | Щербак Юлія Петрівна | ",
+       "description": "В системі HRIS створено запит на розірвання договору. \r\n        ГА - Щербак Юлія Петрівна \r\n        AD -  \r\n        тел: +380000000462 \r\n        Автор запиту - t.author\r\n        Заборгованості по техніці немає \r\n",
+       "custom_fields": [
+        {
+         "id": 30,
+         "name": "Termination date",
+         "value": "$YESTERDAY"
+        }
+       ]
+      }
+     ],
+     "total_count": 1,
+     "offset": 0,
+     "limit": 100
+    }
+   ],
+   "[AD] Search User": {
+    "__by_login": {
+     "Shcherbak": [
+      {
+       "dn": "CN=Yuliia Shcherbak,OU=linear_staff,OU=AllUsers,OU=COMPANY,DC=example,DC=com",
+       "sAMAccountName": "y.shcherbak",
+       "givenName": "Yuliia",
+       "sn": "Shcherbak",
+       "displayName": "Yuliia Shcherbak",
+       "cn": "Yuliia Shcherbak",
+       "userAccountControl": "512"
+      }
+     ]
+    }
+   },
+   "[Google] Delete Guest": {
+    "__by_login": {
+     "Shcherbak": {
+      "statusCode": 204,
+      "body": ""
+     }
+    }
+   },
+   "[Google] Check API Access": {
+    "statusCode": 200
+   }
+  },
+  "counts": {
+   "[Redmine] Comment Missing Data": 0,
+   "[AD] Disable Account": 1,
+   "[AD] Move to Fired OU": 1,
+   "[Redmine] Update Ticket::close=True": 1,
+   "[Sheets] Add to Archive": 1
+  },
+  "has": {
+   "Code: Parse Tickets": [
+    {
+     "lookup": "name",
+     "sn": "Shcherbak",
+     "gn": "Yuliia",
+     "ldap_filter": "(&(objectClass=user)(|(sn=Shcherbak)(sAMAccountName=yuliia.shcherbak)(sAMAccountName=y.shcherbak)(sAMAccountName=ms.y.shcherbak)(sAMAccountName=ms.yuliia.shcherbak)))"
+    }
+   ],
+   "Code: Decide AD Action": [
+    {
+     "login": "y.shcherbak",
+     "found_by_name": true,
+     "guest_email": "y.shcherbak_example.com@tenant.example.org.guest.google"
+    }
+   ],
+   "[Redmine] Update Ticket::close=True": [
+    {
+     "note": "~знайдено в AD за ПІБ"
+    }
+   ],
+   "[Sheets] Add to Archive": [
+    {
+     "login": "y.shcherbak"
+    }
+   ]
+  }
+ },
+ {
+  "name": "порожній «AD -» і немає ПІБ: коментар",
+  "stubs": {
+   "[Redmine] Get Open Leaver Tickets": [
+    {
+     "issues": [
+      {
+       "id": 50461,
+       "tracker": {
+        "id": 41,
+        "name": "GA | Leaver"
+       },
+       "status": {
+        "id": 1,
+        "name": "New"
+       },
+       "subject": "GA | Leaver |  | ",
+       "description": "В системі HRIS створено запит на розірвання договору. \r\n        ГА -  \r\n        AD -  \r\n        тел: +380000000461 \r\n        Автор запиту - t.author\r\n        Заборгованості по техніці немає \r\n",
+       "custom_fields": [
+        {
+         "id": 30,
+         "name": "Termination date",
+         "value": "$YESTERDAY"
+        }
+       ]
+      }
+     ],
+     "total_count": 1,
+     "offset": 0,
+     "limit": 100
+    }
+   ],
+   "[Google] Check API Access": {
+    "statusCode": 200
+   }
+  },
+  "counts": {
+   "[Redmine] Comment Missing Data": 1,
+   "[AD] Search User": 0,
+   "[Redmine] Update Ticket::close=True": 0
+  },
+  "has": {
+   "[Redmine] Comment Missing Data": [
+    {
+     "id": 50461,
+     "note": "~AD-логін не вказано"
+    }
+   ]
+  }
+ },
+ {
+  "name": "транслітерація КМУ-2010: Є/Ї/Й/Ю/Я на початку, зг, ь, апостроф",
+  "stubs": {
+   "[Redmine] Get Open Leaver Tickets": [
+    {
+     "issues": [
+      {
+       "id": 201,
+       "tracker": {
+        "id": 41,
+        "name": "GA | Leaver"
+       },
+       "status": {
+        "id": 1,
+        "name": "New"
+       },
+       "subject": "GA | Leaver | Ярошенко Ольга | ",
+       "description": "В системі HRIS створено запит на розірвання договору. \r\n        ГА - Ярошенко Ольга \r\n        AD -  \r\n        тел: +380000000201 \r\n        Автор запиту - t.author\r\n        Заборгованості по техніці немає \r\n",
+       "custom_fields": [
+        {
+         "id": 30,
+         "name": "Termination date",
+         "value": "$YESTERDAY"
+        }
+       ]
+      },
+      {
+       "id": 202,
+       "tracker": {
+        "id": 41,
+        "name": "GA | Leaver"
+       },
+       "status": {
+        "id": 1,
+        "name": "New"
+       },
+       "subject": "GA | Leaver | Згурський Йосип | ",
+       "description": "В системі HRIS створено запит на розірвання договору. \r\n        ГА - Згурський Йосип \r\n        AD -  \r\n        тел: +380000000202 \r\n        Автор запиту - t.author\r\n        Заборгованості по техніці немає \r\n",
+       "custom_fields": [
+        {
+         "id": 30,
+         "name": "Termination date",
+         "value": "$YESTERDAY"
+        }
+       ]
+      },
+      {
+       "id": 203,
+       "tracker": {
+        "id": 41,
+        "name": "GA | Leaver"
+       },
+       "status": {
+        "id": 1,
+        "name": "New"
+       },
+       "subject": "GA | Leaver | Їжакевич Мар'яна | ",
+       "description": "В системі HRIS створено запит на розірвання договору. \r\n        ГА - Їжакевич Мар'яна \r\n        AD -  \r\n        тел: +380000000203 \r\n        Автор запиту - t.author\r\n        Заборгованості по техніці немає \r\n",
+       "custom_fields": [
+        {
+         "id": 30,
+         "name": "Termination date",
+         "value": "$YESTERDAY"
+        }
+       ]
+      },
+      {
+       "id": 204,
+       "tracker": {
+        "id": 41,
+        "name": "GA | Leaver"
+       },
+       "status": {
+        "id": 1,
+        "name": "New"
+       },
+       "subject": "GA | Leaver | Юрченко Євген | ",
+       "description": "В системі HRIS створено запит на розірвання договору. \r\n        ГА - Юрченко Євген \r\n        AD -  \r\n        тел: +380000000204 \r\n        Автор запиту - t.author\r\n        Заборгованості по техніці немає \r\n",
+       "custom_fields": [
+        {
+         "id": 30,
+         "name": "Termination date",
+         "value": "$YESTERDAY"
+        }
+       ]
+      },
+      {
+       "id": 205,
+       "tracker": {
+        "id": 41,
+        "name": "GA | Leaver"
+       },
+       "status": {
+        "id": 1,
+        "name": "New"
+       },
+       "subject": "GA | Leaver | Гончарний Юлія | ",
+       "description": "В системі HRIS створено запит на розірвання договору. \r\n        ГА - Гончарний Юлія \r\n        AD -  \r\n        тел: +380000000205 \r\n        Автор запиту - t.author\r\n        Заборгованості по техніці немає \r\n",
+       "custom_fields": [
+        {
+         "id": 30,
+         "name": "Termination date",
+         "value": "$YESTERDAY"
+        }
+       ]
+      }
+     ],
+     "total_count": 5,
+     "offset": 0,
+     "limit": 100
+    }
+   ],
+   "[Google] Check API Access": {
+    "statusCode": 200
+   }
+  },
+  "has": {
+   "Code: Parse Tickets": [
+    {
+     "sn": "Yaroshenko",
+     "gn": "Olha"
+    },
+    {
+     "sn": "Zghurskyi",
+     "gn": "Yosyp"
+    },
+    {
+     "sn": "Yizhakevych",
+     "gn": "Mariana"
+    },
+    {
+     "sn": "Yurchenko",
+     "gn": "Yevhen"
+    },
+    {
+     "sn": "Honcharnyi",
+     "gn": "Yuliia"
+    }
+   ]
+  }
+ },
+ {
+  "name": "префікс «ФОП» перед ПІБ відкидається",
+  "stubs": {
+   "[Redmine] Get Open Leaver Tickets": [
+    {
+     "issues": [
+      {
+       "id": 211,
+       "tracker": {
+        "id": 41,
+        "name": "GA | Leaver"
+       },
+       "status": {
+        "id": 1,
+        "name": "New"
+       },
+       "subject": "GA | Leaver | ФОП Москаленко Вікторія Ігорівна | ",
+       "description": "В системі HRIS створено запит на розірвання договору. \r\n        ГА - ФОП Москаленко Вікторія Ігорівна \r\n        AD -  \r\n        тел: +380000000211 \r\n        Автор запиту - t.author\r\n        Заборгованості по техніці немає \r\n",
+       "custom_fields": [
+        {
+         "id": 30,
+         "name": "Termination date",
+         "value": "$YESTERDAY"
+        }
+       ]
+      }
+     ],
+     "total_count": 1,
+     "offset": 0,
+     "limit": 100
+    }
+   ],
+   "[Google] Check API Access": {
+    "statusCode": 200
+   }
+  },
+  "has": {
+   "Code: Parse Tickets": [
+    {
+     "sn": "Moskalenko",
+     "gn": "Viktoriia",
+     "fio": "Москаленко Вікторія Ігорівна"
+    }
+   ]
+  }
+ },
+ {
+  "name": "ПІБ лише з теми, якщо рядка «ГА -» немає",
+  "stubs": {
+   "[Redmine] Get Open Leaver Tickets": [
+    {
+     "issues": [
+      {
+       "id": 206,
+       "tracker": {
+        "id": 41,
+        "name": "GA | Leaver"
+       },
+       "status": {
+        "id": 1,
+        "name": "New"
+       },
+       "subject": "GA | Leaver | Сидоренко Олег | ",
+       "description": "Запит на розірвання. \r\n AD - \r\n тел: +380000000206",
+       "custom_fields": [
+        {
+         "id": 30,
+         "name": "Termination date",
+         "value": "$YESTERDAY"
+        }
+       ]
+      }
+     ],
+     "total_count": 1,
+     "offset": 0,
+     "limit": 100
+    }
+   ],
+   "[Google] Check API Access": {
+    "statusCode": 200
+   }
+  },
+  "has": {
+   "Code: Parse Tickets": [
+    {
+     "sn": "Sydorenko",
+     "gn": "Oleh",
+     "lookup": "name"
+    }
+   ]
+  }
+ },
+ {
+  "name": "за ПІБ два збіги: нічого не блокуємо, кандидати в коментарі",
+  "stubs": {
+   "[Redmine] Get Open Leaver Tickets": [
+    {
+     "issues": [
+      {
+       "id": 207,
+       "tracker": {
+        "id": 41,
+        "name": "GA | Leaver"
+       },
+       "status": {
+        "id": 1,
+        "name": "New"
+       },
+       "subject": "GA | Leaver | Коваль Іван | ",
+       "description": "В системі HRIS створено запит на розірвання договору. \r\n        ГА - Коваль Іван \r\n        AD -  \r\n        тел: +380000000207 \r\n        Автор запиту - t.author\r\n        Заборгованості по техніці немає \r\n",
+       "custom_fields": [
+        {
+         "id": 30,
+         "name": "Termination date",
+         "value": "$YESTERDAY"
+        }
+       ]
+      }
+     ],
+     "total_count": 1,
+     "offset": 0,
+     "limit": 100
+    }
+   ],
+   "[AD] Search User": {
+    "__by_login": {
+     "Koval": [
+      {
+       "dn": "CN=Ivan Koval,OU=linear_staff,OU=AllUsers,OU=COMPANY,DC=example,DC=com",
+       "sAMAccountName": "i.koval",
+       "givenName": "Ivan",
+       "sn": "Koval",
+       "displayName": "Ivan Koval",
+       "cn": "Ivan Koval",
+       "userAccountControl": "512"
+      },
+      {
+       "dn": "CN=Ivan Koval,OU=Уволенные,DC=example,DC=com",
+       "sAMAccountName": "ivan.koval",
+       "givenName": "Ivan",
+       "sn": "Koval",
+       "displayName": "Ivan Koval",
+       "cn": "Ivan Koval",
+       "userAccountControl": "514"
+      },
+      {
+       "dn": "CN=Petro Koval,OU=linear_staff,OU=AllUsers,OU=COMPANY,DC=example,DC=com",
+       "sAMAccountName": "p.koval",
+       "givenName": "Petro",
+       "sn": "Koval",
+       "displayName": "Petro Koval",
+       "cn": "Petro Koval",
+       "userAccountControl": "512"
+      }
+     ]
+    }
+   },
+   "[Google] Check API Access": {
+    "statusCode": 200
+   }
+  },
+  "counts": {
+   "[AD] Disable Account": 0,
+   "[Google] Delete Guest": 0,
+   "[Redmine] Update Ticket::close=True": 0,
+   "[Redmine] Update Ticket::close=False": 1
+  },
+  "has": {
+   "[Redmine] Update Ticket::close=False": [
+    {
+     "id": 207,
+     "note": "~i.koval (linear_staff, активний); ivan.koval (Уволенные, заблокований)"
+    }
+   ]
+  }
+ },
+ {
+  "name": "за ПІБ лише однофамільці: не знайдено, підказка в коментарі",
+  "stubs": {
+   "[Redmine] Get Open Leaver Tickets": [
+    {
+     "issues": [
+      {
+       "id": 208,
+       "tracker": {
+        "id": 41,
+        "name": "GA | Leaver"
+       },
+       "status": {
+        "id": 1,
+        "name": "New"
+       },
+       "subject": "GA | Leaver | Бондар Олена | ",
+       "description": "В системі HRIS створено запит на розірвання договору. \r\n        ГА - Бондар Олена \r\n        AD -  \r\n        тел: +380000000208 \r\n        Автор запиту - t.author\r\n        Заборгованості по техніці немає \r\n",
+       "custom_fields": [
+        {
+         "id": 30,
+         "name": "Termination date",
+         "value": "$YESTERDAY"
+        }
+       ]
+      }
+     ],
+     "total_count": 1,
+     "offset": 0,
+     "limit": 100
+    }
+   ],
+   "[AD] Search User": {
+    "__by_login": {
+     "Bondar": [
+      {
+       "dn": "CN=Taras Bondar,OU=linear_staff,OU=AllUsers,OU=COMPANY,DC=example,DC=com",
+       "sAMAccountName": "t.bondar",
+       "givenName": "Taras",
+       "sn": "Bondar",
+       "displayName": "Taras Bondar",
+       "cn": "Taras Bondar",
+       "userAccountControl": "512"
+      }
+     ]
+    }
+   },
+   "[Google] Check API Access": {
+    "statusCode": 200
+   }
+  },
+  "counts": {
+   "[AD] Disable Account": 0,
+   "[Google] Delete Guest": 0,
+   "[Redmine] Update Ticket::close=False": 1
+  },
+  "has": {
+   "[Redmine] Update Ticket::close=False": [
+    {
+     "note": "~З таким прізвищем є: Taras Bondar: t.bondar"
+    }
+   ]
+  }
+ },
+ {
+  "name": "за ПІБ: ім'я в AD іншим регістром теж збіг",
+  "stubs": {
+   "[Redmine] Get Open Leaver Tickets": [
+    {
+     "issues": [
+      {
+       "id": 209,
+       "tracker": {
+        "id": 41,
+        "name": "GA | Leaver"
+       },
+       "status": {
+        "id": 1,
+        "name": "New"
+       },
+       "subject": "GA | Leaver | Мельник Анна | ",
+       "description": "В системі HRIS створено запит на розірвання договору. \r\n        ГА - Мельник Анна \r\n        AD -  \r\n        тел: +380000000209 \r\n        Автор запиту - t.author\r\n        Заборгованості по техніці немає \r\n",
+       "custom_fields": [
+        {
+         "id": 30,
+         "name": "Termination date",
+         "value": "$YESTERDAY"
+        }
+       ]
+      }
+     ],
+     "total_count": 1,
+     "offset": 0,
+     "limit": 100
+    }
+   ],
+   "[AD] Search User": {
+    "__by_login": {
+     "Melnyk": [
+      {
+       "dn": "CN=ANNA MELNYK,OU=linear_staff,OU=AllUsers,OU=COMPANY,DC=example,DC=com",
+       "sAMAccountName": "a.melnyk",
+       "givenName": "ANNA",
+       "sn": "MELNYK",
+       "displayName": "ANNA MELNYK",
+       "cn": "ANNA MELNYK",
+       "userAccountControl": "512"
+      }
+     ]
+    }
+   },
+   "[Google] Delete Guest": {
+    "__by_login": {
+     "Melnyk": {
+      "statusCode": 204,
+      "body": ""
+     }
+    }
+   },
+   "[Google] Check API Access": {
+    "statusCode": 200
+   }
+  },
+  "counts": {
+   "[Redmine] Update Ticket::close=True": 1
+  },
+  "has": {
+   "Code: Decide AD Action": [
+    {
+     "login": "a.melnyk"
+    }
+   ]
+  }
+ },
+ {
+  "name": "за ПІБ: ім'я/прізвище в AD порожні, знайдено за шаблоном логіна ms.і.прізвище",
+  "stubs": {
+   "[Redmine] Get Open Leaver Tickets": [
+    {
+     "issues": [
+      {
+       "id": 212,
+       "tracker": {
+        "id": 41,
+        "name": "GA | Leaver"
+       },
+       "status": {
+        "id": 1,
+        "name": "New"
+       },
+       "subject": "GA | Leaver | Логвінов Олексій | ",
+       "description": "В системі HRIS створено запит на розірвання договору. \r\n        ГА - Логвінов Олексій \r\n        AD -  \r\n        тел: +380000000212 \r\n        Автор запиту - t.author\r\n        Заборгованості по техніці немає \r\n",
+       "custom_fields": [
+        {
+         "id": 30,
+         "name": "Termination date",
+         "value": "$YESTERDAY"
+        }
+       ]
+      }
+     ],
+     "total_count": 1,
+     "offset": 0,
+     "limit": 100
+    }
+   ],
+   "[AD] Search User": {
+    "__by_login": {
+     "Lohvinov": [
+      {
+       "dn": "CN=ms.o.lohvinov,OU=linear_staff,OU=AllUsers,OU=COMPANY,DC=example,DC=com",
+       "sAMAccountName": "ms.o.lohvinov",
+       "givenName": [],
+       "sn": [],
+       "userAccountControl": "512"
+      }
+     ]
+    }
+   },
+   "[Google] Delete Guest": {
+    "__by_login": {
+     "Lohvinov": {
+      "statusCode": 204,
+      "body": ""
+     }
+    }
+   },
+   "[Google] Check API Access": {
+    "statusCode": 200
+   }
+  },
+  "counts": {
+   "[Redmine] Update Ticket::close=True": 1
+  },
+  "has": {
+   "Code: Decide AD Action": [
+    {
+     "login": "ms.o.lohvinov",
+     "found_by_login_pattern": true
+    }
+   ],
+   "[Redmine] Update Ticket::close=True": [
+    {
+     "note": "~знайдено за шаблоном логіна"
+    }
+   ]
+  }
+ },
+ {
+  "name": "за ПІБ: логін за шаблоном, але прізвище в AD інше -> не беремо",
+  "stubs": {
+   "[Redmine] Get Open Leaver Tickets": [
+    {
+     "issues": [
+      {
+       "id": 213,
+       "tracker": {
+        "id": 41,
+        "name": "GA | Leaver"
+       },
+       "status": {
+        "id": 1,
+        "name": "New"
+       },
+       "subject": "GA | Leaver | Логвінов Олексій | ",
+       "description": "В системі HRIS створено запит на розірвання договору. \r\n        ГА - Логвінов Олексій \r\n        AD -  \r\n        тел: +380000000213 \r\n        Автор запиту - t.author\r\n        Заборгованості по техніці немає \r\n",
+       "custom_fields": [
+        {
+         "id": 30,
+         "name": "Termination date",
+         "value": "$YESTERDAY"
+        }
+       ]
+      }
+     ],
+     "total_count": 1,
+     "offset": 0,
+     "limit": 100
+    }
+   ],
+   "[AD] Search User": {
+    "__by_login": {
+     "Lohvinov": [
+      {
+       "dn": "CN=Other,OU=AllUsers,OU=COMPANY,DC=example,DC=com",
+       "sAMAccountName": "o.lohvinov",
+       "givenName": "Olha",
+       "sn": "Lohvinova",
+       "userAccountControl": "512"
+      }
+     ]
+    }
+   },
+   "[Google] Check API Access": {
+    "statusCode": 200
+   }
+  },
+  "counts": {
+   "[AD] Disable Account": 0,
+   "[Redmine] Update Ticket::close=False": 1
+  },
+  "has": {
+   "Code: Decide AD Action": [
+    {
+     "ad_status": "name_not_found"
+    }
+   ]
+  }
+ },
+ {
+  "name": "за ПІБ: єдиний збіг поза AllUsers не блокуємо",
+  "stubs": {
+   "[Redmine] Get Open Leaver Tickets": [
+    {
+     "issues": [
+      {
+       "id": 210,
+       "tracker": {
+        "id": 41,
+        "name": "GA | Leaver"
+       },
+       "status": {
+        "id": 1,
+        "name": "New"
+       },
+       "subject": "GA | Leaver | Ткач Ігор | ",
+       "description": "В системі HRIS створено запит на розірвання договору. \r\n        ГА - Ткач Ігор \r\n        AD -  \r\n        тел: +380000000210 \r\n        Автор запиту - t.author\r\n        Заборгованості по техніці немає \r\n",
+       "custom_fields": [
+        {
+         "id": 30,
+         "name": "Termination date",
+         "value": "$YESTERDAY"
+        }
+       ]
+      }
+     ],
+     "total_count": 1,
+     "offset": 0,
+     "limit": 100
+    }
+   ],
+   "[AD] Search User": {
+    "__by_login": {
+     "Tkach": [
+      {
+       "dn": "CN=Ihor Tkach,OU=Admins,OU=COMPANY,DC=example,DC=com",
+       "sAMAccountName": "i.tkach",
+       "givenName": "Ihor",
+       "sn": "Tkach",
+       "displayName": "Ihor Tkach",
+       "cn": "Ihor Tkach",
+       "userAccountControl": "512"
+      }
+     ]
+    }
+   },
+   "[Google] Check API Access": {
+    "statusCode": 200
+   }
+  },
+  "counts": {
+   "[AD] Disable Account": 0,
+   "[Redmine] Update Ticket::close=False": 1
+  },
+  "has": {
+   "[Redmine] Update Ticket::close=False": [
+    {
+     "note": "~поза OU=AllUsers"
+    }
+   ]
+  }
+ },
+ {
+  "name": "щасливий шлях: блокування, перенос, гостя видалено, заявку закрито",
+  "stubs": {
+   "[Redmine] Get Open Leaver Tickets": [
+    {
+     "issues": [
+      {
+       "id": 101,
+       "tracker": {
+        "id": 41,
+        "name": "GA | Leaver"
+       },
+       "status": {
+        "id": 1,
+        "name": "New"
+       },
+       "subject": "GA | Leaver | Тестовий Користувач Іванович | ",
+       "description": "В системі HRIS створено запит на розірвання договору. \r\n        ГА - Тестовий Користувач Іванович \r\n        AD - ivan.test \r\n        тел: +380000000101 \r\n        Автор запиту - t.author\r\n        Заборгованості по техніці немає \r\n",
+       "custom_fields": [
+        {
+         "id": 30,
+         "name": "Termination date",
+         "value": "$YESTERDAY"
+        }
+       ]
+      }
+     ],
+     "total_count": 1,
+     "offset": 0,
+     "limit": 100
+    }
+   ],
+   "[AD] Search User": {
+    "__by_login": {
+     "ivan.test": [
+      {
+       "dn": "CN=Ivan Test,OU=AllUsers,OU=COMPANY,DC=example,DC=com",
+       "userAccountControl": "512"
+      }
+     ]
+    }
+   },
+   "[Google] Delete Guest": {
+    "__by_login": {
+     "ivan.test": {
+      "statusCode": 204,
+      "body": ""
+     }
+    }
+   },
+   "[Google] Check API Access": {
+    "statusCode": 200
+   }
+  },
+  "counts": {
+   "[AD] Disable Account": 1,
+   "[AD] Move to Fired OU": 1,
+   "[Google] Delete Guest": 1,
+   "[Redmine] Update Ticket::close=True": 1,
+   "[Sheets] Add to Archive": 1,
+   "[Redmine] Update Ticket::close=False": 0,
+   "[Redmine] Comment Missing Data": 0
+  },
+  "has": {
+   "Code: Decide AD Action": [
+    {
+     "ad_status": "disable",
+     "new_uac": "514",
+     "target_dn": "CN=Ivan Test,OU=Уволенные,DC=example,DC=com",
+     "guest_email": "ivan.test_example.com@tenant.example.org.guest.google"
+    }
+   ],
+   "[Redmine] Update Ticket::close=True": [
+    {
+     "id": 101,
+     "note": "~Гостьовий запис видалено"
+    }
+   ]
+  }
+ },
+ {
+  "name": "інші прапорці userAccountControl зберігаються (66048 -> 66050)",
+  "stubs": {
+   "[Redmine] Get Open Leaver Tickets": [
+    {
+     "issues": [
+      {
+       "id": 102,
+       "tracker": {
+        "id": 41,
+        "name": "GA | Leaver"
+       },
+       "status": {
+        "id": 1,
+        "name": "New"
+       },
+       "subject": "GA | Leaver | Тестовий Користувач Іванович | ",
+       "description": "В системі HRIS створено запит на розірвання договору. \r\n        ГА - Тестовий Користувач Іванович \r\n        AD - keep.flags \r\n        тел: +380000000102 \r\n        Автор запиту - t.author\r\n        Заборгованості по техніці немає \r\n",
+       "custom_fields": [
+        {
+         "id": 30,
+         "name": "Termination date",
+         "value": "$YESTERDAY"
+        }
+       ]
+      }
+     ],
+     "total_count": 1,
+     "offset": 0,
+     "limit": 100
+    }
+   ],
+   "[AD] Search User": {
+    "__by_login": {
+     "keep.flags": [
+      {
+       "dn": "CN=Keep Flags,OU=Sub,OU=AllUsers,OU=COMPANY,DC=example,DC=com",
+       "userAccountControl": "66048"
+      }
+     ]
+    }
+   },
+   "[Google] Delete Guest": {
+    "__by_login": {
+     "keep.flags": {
+      "statusCode": 204,
+      "body": ""
+     }
+    }
+   },
+   "[Google] Check API Access": {
+    "statusCode": 200
+   }
+  },
+  "has": {
+   "Code: Decide AD Action": [
+    {
+     "new_uac": "66050",
+     "target_dn": "CN=Keep Flags,OU=Уволенные,DC=example,DC=com"
+    }
+   ]
+  }
+ },
+ {
+  "name": "кома в CN екранована: правильний новий DN",
+  "stubs": {
+   "[Redmine] Get Open Leaver Tickets": [
+    {
+     "issues": [
+      {
+       "id": 103,
+       "tracker": {
+        "id": 41,
+        "name": "GA | Leaver"
+       },
+       "status": {
+        "id": 1,
+        "name": "New"
+       },
+       "subject": "GA | Leaver | Тестовий Користувач Іванович | ",
+       "description": "В системі HRIS створено запит на розірвання договору. \r\n        ГА - Тестовий Користувач Іванович \r\n        AD - comma.cn \r\n        тел: +380000000103 \r\n        Автор запиту - t.author\r\n        Заборгованості по техніці немає \r\n",
+       "custom_fields": [
+        {
+         "id": 30,
+         "name": "Termination date",
+         "value": "$YESTERDAY"
+        }
+       ]
+      }
+     ],
+     "total_count": 1,
+     "offset": 0,
+     "limit": 100
+    }
+   ],
+   "[AD] Search User": {
+    "__by_login": {
+     "comma.cn": [
+      {
+       "dn": "CN=Test\\, Comma,OU=AllUsers,OU=COMPANY,DC=example,DC=com",
+       "userAccountControl": "512"
+      }
+     ]
+    }
+   },
+   "[Google] Delete Guest": {
+    "__by_login": {
+     "comma.cn": {
+      "statusCode": 204,
+      "body": ""
+     }
+    }
+   },
+   "[Google] Check API Access": {
+    "statusCode": 200
+   }
+  },
+  "has": {
+   "Code: Decide AD Action": [
+    {
+     "target_dn": "CN=Test\\, Comma,OU=Уволенные,DC=example,DC=com"
+    }
+   ]
+  }
+ },
+ {
+  "name": "дата в майбутньому: нічого не робимо",
+  "stubs": {
+   "[Redmine] Get Open Leaver Tickets": [
+    {
+     "issues": [
+      {
+       "id": 104,
+       "tracker": {
+        "id": 41,
+        "name": "GA | Leaver"
+       },
+       "status": {
+        "id": 1,
+        "name": "New"
+       },
+       "subject": "GA | Leaver | Тестовий Користувач Іванович | ",
+       "description": "В системі HRIS створено запит на розірвання договору. \r\n        ГА - Тестовий Користувач Іванович \r\n        AD - future.user \r\n        тел: +380000000104 \r\n        Автор запиту - t.author\r\n        Заборгованості по техніці немає \r\n",
+       "custom_fields": [
+        {
+         "id": 30,
+         "name": "Termination date",
+         "value": "$TOMORROW"
+        }
+       ]
+      }
+     ],
+     "total_count": 1,
+     "offset": 0,
+     "limit": 100
+    }
+   ],
+   "[Google] Check API Access": {
+    "statusCode": 200
+   }
+  },
+  "counts": {
+   "[AD] Search User": 0,
+   "[Redmine] Comment Missing Data": 0,
+   "[Redmine] Update Ticket::close=True": 0
+  }
+ },
+ {
+  "name": "дата сьогодні: обробляємо",
+  "stubs": {
+   "[Redmine] Get Open Leaver Tickets": [
+    {
+     "issues": [
+      {
+       "id": 105,
+       "tracker": {
+        "id": 41,
+        "name": "GA | Leaver"
+       },
+       "status": {
+        "id": 1,
+        "name": "New"
+       },
+       "subject": "GA | Leaver | Тестовий Користувач Іванович | ",
+       "description": "В системі HRIS створено запит на розірвання договору. \r\n        ГА - Тестовий Користувач Іванович \r\n        AD - today.user \r\n        тел: +380000000105 \r\n        Автор запиту - t.author\r\n        Заборгованості по техніці немає \r\n",
+       "custom_fields": [
+        {
+         "id": 30,
+         "name": "Termination date",
+         "value": "$TODAY"
+        }
+       ]
+      }
+     ],
+     "total_count": 1,
+     "offset": 0,
+     "limit": 100
+    }
+   ],
+   "[AD] Search User": {
+    "__by_login": {
+     "today.user": [
+      {
+       "dn": "CN=Today,OU=AllUsers,OU=COMPANY,DC=example,DC=com",
+       "userAccountControl": "512"
+      }
+     ]
+    }
+   },
+   "[Google] Delete Guest": {
+    "__by_login": {
+     "today.user": {
+      "statusCode": 204,
+      "body": ""
+     }
+    }
+   },
+   "[Google] Check API Access": {
+    "statusCode": 200
+   }
+  },
+  "counts": {
+   "[Redmine] Update Ticket::close=True": 1
+  }
+ },
+ {
+  "name": "немає дати ніде: коментар",
+  "stubs": {
+   "[Redmine] Get Open Leaver Tickets": [
+    {
+     "issues": [
+      {
+       "id": 106,
+       "tracker": {
+        "id": 41,
+        "name": "GA | Leaver"
+       },
+       "status": {
+        "id": 1,
+        "name": "New"
+       },
+       "subject": "GA | Leaver | Тестовий Користувач Іванович | ",
+       "description": "В системі HRIS створено запит на розірвання договору. \r\n        ГА - Тестовий Користувач Іванович \r\n        AD - nodate.user \r\n        тел: +380000000106 \r\n        Автор запиту - t.author\r\n        Заборгованості по техніці немає \r\n",
+       "custom_fields": []
+      }
+     ],
+     "total_count": 1,
+     "offset": 0,
+     "limit": 100
+    }
+   ],
+   "[Google] Check API Access": {
+    "statusCode": 200
+   }
+  },
+  "counts": {
+   "[Redmine] Comment Missing Data": 1,
+   "[AD] Search User": 0
+  },
+  "has": {
+   "[Redmine] Comment Missing Data": [
+    {
+     "note": "~не вказано дату звільнення"
+    }
+   ]
+  }
+ },
+ {
+  "name": "дата з теми, якщо полів немає",
+  "stubs": {
+   "[Redmine] Get Open Leaver Tickets": [
+    {
+     "issues": [
+      {
+       "id": 107,
+       "tracker": {
+        "id": 41,
+        "name": "GA | Leaver"
+       },
+       "status": {
+        "id": 1,
+        "name": "New"
+       },
+       "subject": "GA | Leaver | Тестовий Користувач Іванович | $YESTERDAY",
+       "description": "В системі HRIS створено запит на розірвання договору. \r\n        ГА - Тестовий Користувач Іванович \r\n        AD - subj.date \r\n        тел: +380000000107 \r\n        Автор запиту - t.author\r\n        Заборгованості по техніці немає \r\n",
+       "custom_fields": []
+      }
+     ],
+     "total_count": 1,
+     "offset": 0,
+     "limit": 100
+    }
+   ],
+   "[AD] Search User": {
+    "__by_login": {
+     "subj.date": [
+      {
+       "dn": "CN=Subj,OU=AllUsers,OU=COMPANY,DC=example,DC=com",
+       "userAccountControl": "512"
+      }
+     ]
+    }
+   },
+   "[Google] Delete Guest": {
+    "__by_login": {
+     "subj.date": {
+      "statusCode": 204,
+      "body": ""
+     }
+    }
+   },
+   "[Google] Check API Access": {
+    "statusCode": 200
+   }
+  },
+  "counts": {
+   "[Redmine] Update Ticket::close=True": 1
+  }
+ },
+ {
+  "name": "логін кирилицею: неприпустимий формат",
+  "stubs": {
+   "[Redmine] Get Open Leaver Tickets": [
+    {
+     "issues": [
+      {
+       "id": 108,
+       "tracker": {
+        "id": 41,
+        "name": "GA | Leaver"
+       },
+       "status": {
+        "id": 1,
+        "name": "New"
+       },
+       "subject": "GA | Leaver | Тестовий Користувач Іванович | ",
+       "description": "В системі HRIS створено запит на розірвання договору. \r\n        ГА - Тестовий Користувач Іванович \r\n        AD - Іван Тест \r\n        тел: +380000000108 \r\n        Автор запиту - t.author\r\n        Заборгованості по техніці немає \r\n",
+       "custom_fields": [
+        {
+         "id": 30,
+         "name": "Termination date",
+         "value": "$YESTERDAY"
+        }
+       ]
+      }
+     ],
+     "total_count": 1,
+     "offset": 0,
+     "limit": 100
+    }
+   ],
+   "[Google] Check API Access": {
+    "statusCode": 200
+   }
+  },
+  "counts": {
+   "[Redmine] Comment Missing Data": 1,
+   "[AD] Search User": 0
+  },
+  "has": {
+   "[Redmine] Comment Missing Data": [
+    {
+     "note": "~неприпустимий формат"
+    }
+   ]
+  }
+ },
+ {
+  "name": "логін з кастомного поля 87, якщо в описі немає",
+  "stubs": {
+   "[Redmine] Get Open Leaver Tickets": [
+    {
+     "issues": [
+      {
+       "id": 109,
+       "tracker": {
+        "id": 41,
+        "name": "GA | Leaver"
+       },
+       "status": {
+        "id": 1,
+        "name": "New"
+       },
+       "subject": "GA | Leaver | Тестовий Користувач Іванович | ",
+       "description": "ПІБ - Без Рядка\r\nТел: +380000000109",
+       "custom_fields": [
+        {
+         "id": 87,
+         "name": "AD login",
+         "value": "cf.login"
+        },
+        {
+         "id": 30,
+         "name": "Termination date",
+         "value": "$YESTERDAY"
+        }
+       ]
+      }
+     ],
+     "total_count": 1,
+     "offset": 0,
+     "limit": 100
+    }
+   ],
+   "[AD] Search User": {
+    "__by_login": {
+     "cf.login": [
+      {
+       "dn": "CN=CF,OU=AllUsers,OU=COMPANY,DC=example,DC=com",
+       "userAccountControl": "512"
+      }
+     ]
+    }
+   },
+   "[Google] Delete Guest": {
+    "__by_login": {
+     "cf.login": {
+      "statusCode": 204,
+      "body": ""
+     }
+    }
+   },
+   "[Google] Check API Access": {
+    "statusCode": 200
+   }
+  },
+  "counts": {
+   "[Redmine] Update Ticket::close=True": 1
+  },
+  "has": {
+   "Code: Decide AD Action": [
+    {
+     "login": "cf.login"
+    }
+   ]
+  }
+ },
+ {
+  "name": "логін у форматі пошти: sAMAccountName без домену",
+  "stubs": {
+   "[Redmine] Get Open Leaver Tickets": [
+    {
+     "issues": [
+      {
+       "id": 110,
+       "tracker": {
+        "id": 41,
+        "name": "GA | Leaver"
+       },
+       "status": {
+        "id": 1,
+        "name": "New"
+       },
+       "subject": "GA | Leaver | Тестовий Користувач Іванович | ",
+       "description": "В системі HRIS створено запит на розірвання договору. \r\n        ГА - Тестовий Користувач Іванович \r\n        AD - mail.user@example.com \r\n        тел: +380000000110 \r\n        Автор запиту - t.author\r\n        Заборгованості по техніці немає \r\n",
+       "custom_fields": [
+        {
+         "id": 30,
+         "name": "Termination date",
+         "value": "$YESTERDAY"
+        }
+       ]
+      }
+     ],
+     "total_count": 1,
+     "offset": 0,
+     "limit": 100
+    }
+   ],
+   "[AD] Search User": {
+    "__by_login": {
+     "mail.user": [
+      {
+       "dn": "CN=Mail,OU=AllUsers,OU=COMPANY,DC=example,DC=com",
+       "userAccountControl": "512"
+      }
+     ]
+    }
+   },
+   "[Google] Delete Guest": {
+    "__by_login": {
+     "mail.user": {
+      "statusCode": 204,
+      "body": ""
+     }
+    }
+   },
+   "[Google] Check API Access": {
+    "statusCode": 200
+   }
+  },
+  "has": {
+   "Code: Decide AD Action": [
+    {
+     "login": "mail.user",
+     "guest_email": "mail.user_example.com@tenant.example.org.guest.google"
+    }
+   ]
+  }
+ },
+ {
+  "name": "інший трекер ігнорується",
+  "stubs": {
+   "[Redmine] Get Open Leaver Tickets": [
+    {
+     "issues": [
+      {
+       "id": 111,
+       "tracker": {
+        "id": 25,
+        "name": "GA | Leaver"
+       },
+       "status": {
+        "id": 1,
+        "name": "New"
+       },
+       "subject": "GA | Leaver | Тестовий Користувач Іванович | ",
+       "description": "В системі HRIS створено запит на розірвання договору. \r\n        ГА - Тестовий Користувач Іванович \r\n        AD - other.tracker \r\n        тел: +380000000111 \r\n        Автор запиту - t.author\r\n        Заборгованості по техніці немає \r\n",
+       "custom_fields": [
+        {
+         "id": 30,
+         "name": "Termination date",
+         "value": "$YESTERDAY"
+        }
+       ]
+      }
+     ],
+     "total_count": 1,
+     "offset": 0,
+     "limit": 100
+    }
+   ],
+   "[Google] Check API Access": {
+    "statusCode": 200
+   }
+  },
+  "counts": {
+   "[AD] Search User": 0,
+   "[Redmine] Comment Missing Data": 0
+  }
+ },
+ {
+  "name": "немає в AD і немає гостя (404): імовірно видалено за неактивність, закриваємо",
+  "stubs": {
+   "[Redmine] Get Open Leaver Tickets": [
+    {
+     "issues": [
+      {
+       "id": 112,
+       "tracker": {
+        "id": 41,
+        "name": "GA | Leaver"
+       },
+       "status": {
+        "id": 1,
+        "name": "New"
+       },
+       "subject": "GA | Leaver | Тестовий Користувач Іванович | ",
+       "description": "В системі HRIS створено запит на розірвання договору. \r\n        ГА - Тестовий Користувач Іванович \r\n        AD - ghost.user \r\n        тел: +380000000112 \r\n        Автор запиту - t.author\r\n        Заборгованості по техніці немає \r\n",
+       "custom_fields": [
+        {
+         "id": 30,
+         "name": "Termination date",
+         "value": "$YESTERDAY"
+        }
+       ]
+      }
+     ],
+     "total_count": 1,
+     "offset": 0,
+     "limit": 100
+    }
+   ],
+   "[AD] Search User": {
+    "__by_login": {}
+   },
+   "[Google] Check Guest Exists": {
+    "__by_login": {
+     "ghost.user": {
+      "statusCode": 404,
+      "body": {
+       "error": {
+        "code": 404,
+        "message": "Resource Not Found: userKey"
+       }
+      }
+     }
+    }
+   },
+   "[Google] Check API Access": {
+    "statusCode": 200
+   }
+  },
+  "counts": {
+   "[Google] Check Guest Exists": 1,
+   "[Google] Delete Guest": 0,
+   "[AD] Disable Account": 0,
+   "[Redmine] Update Ticket::close=True": 1,
+   "[Sheets] Add to Archive": 1,
+   "[Redmine] Update Ticket::close=False": 0
+  },
+  "has": {
+   "[Redmine] Update Ticket::close=True": [
+    {
+     "id": 112,
+     "note": "~видалено автоматично"
+    }
+   ],
+   "[Sheets] Add to Archive": [
+    {
+     "login": "ghost.user"
+    }
+   ]
+  }
+ },
+ {
+  "name": "немає в AD, а гість є: нічого не видаляємо, коментар",
+  "stubs": {
+   "[Redmine] Get Open Leaver Tickets": [
+    {
+     "issues": [
+      {
+       "id": 130,
+       "tracker": {
+        "id": 41,
+        "name": "GA | Leaver"
+       },
+       "status": {
+        "id": 1,
+        "name": "New"
+       },
+       "subject": "GA | Leaver | Тестовий Користувач Іванович | ",
+       "description": "В системі HRIS створено запит на розірвання договору. \r\n        ГА - Тестовий Користувач Іванович \r\n        AD - half.ghost \r\n        тел: +380000000130 \r\n        Автор запиту - t.author\r\n        Заборгованості по техніці немає \r\n",
+       "custom_fields": [
+        {
+         "id": 30,
+         "name": "Termination date",
+         "value": "$YESTERDAY"
+        }
+       ]
+      }
+     ],
+     "total_count": 1,
+     "offset": 0,
+     "limit": 100
+    }
+   ],
+   "[AD] Search User": {
+    "__by_login": {}
+   },
+   "[Google] Check Guest Exists": {
+    "__by_login": {
+     "half.ghost": {
+      "statusCode": 200,
+      "body": {
+       "primaryEmail": "x"
+      }
+     }
+    }
+   },
+   "[Google] Check API Access": {
+    "statusCode": 200
+   }
+  },
+  "counts": {
+   "[Google] Delete Guest": 0,
+   "[Redmine] Update Ticket::close=True": 0,
+   "[Redmine] Update Ticket::close=False": 1
+  },
+  "has": {
+   "[Redmine] Update Ticket::close=False": [
+    {
+     "id": 130,
+     "note": "~гостьовий акаунт у Google є"
+    }
+   ]
+  }
+ },
+ {
+  "name": "немає в AD, гість 403 і доступ до Google працює: гостя немає, закриваємо",
+  "stubs": {
+   "[Redmine] Get Open Leaver Tickets": [
+    {
+     "issues": [
+      {
+       "id": 132,
+       "tracker": {
+        "id": 41,
+        "name": "GA | Leaver"
+       },
+       "status": {
+        "id": 1,
+        "name": "New"
+       },
+       "subject": "GA | Leaver | Тестовий Користувач Іванович | ",
+       "description": "В системі HRIS створено запит на розірвання договору. \r\n        ГА - Тестовий Користувач Іванович \r\n        AD - gone.403 \r\n        тел: +380000000132 \r\n        Автор запиту - t.author\r\n        Заборгованості по техніці немає \r\n",
+       "custom_fields": [
+        {
+         "id": 30,
+         "name": "Termination date",
+         "value": "$YESTERDAY"
+        }
+       ]
+      }
+     ],
+     "total_count": 1,
+     "offset": 0,
+     "limit": 100
+    }
+   ],
+   "[AD] Search User": {
+    "__by_login": {}
+   },
+   "[Google] Check Guest Exists": {
+    "__by_login": {
+     "gone.403": {
+      "statusCode": 403,
+      "body": {
+       "error": {
+        "code": 403,
+        "message": "Not Authorized to access this resource/api"
+       }
+      }
+     }
+    }
+   },
+   "[Google] Check API Access": {
+    "statusCode": 200
+   }
+  },
+  "counts": {
+   "[Redmine] Update Ticket::close=True": 1,
+   "[Redmine] Update Ticket::close=False": 0
+  },
+  "has": {
+   "[Redmine] Update Ticket::close=True": [
+    {
+     "note": "~не існує (Google: 403)"
+    }
+   ]
+  }
+ },
+ {
+  "name": "немає в AD, гість 403, але доступ до Google не працює: коментар, не закриваємо",
+  "stubs": {
+   "[Redmine] Get Open Leaver Tickets": [
+    {
+     "issues": [
+      {
+       "id": 131,
+       "tracker": {
+        "id": 41,
+        "name": "GA | Leaver"
+       },
+       "status": {
+        "id": 1,
+        "name": "New"
+       },
+       "subject": "GA | Leaver | Тестовий Користувач Іванович | ",
+       "description": "В системі HRIS створено запит на розірвання договору. \r\n        ГА - Тестовий Користувач Іванович \r\n        AD - gc.fail \r\n        тел: +380000000131 \r\n        Автор запиту - t.author\r\n        Заборгованості по техніці немає \r\n",
+       "custom_fields": [
+        {
+         "id": 30,
+         "name": "Termination date",
+         "value": "$YESTERDAY"
+        }
+       ]
+      }
+     ],
+     "total_count": 1,
+     "offset": 0,
+     "limit": 100
+    }
+   ],
+   "[AD] Search User": {
+    "__by_login": {}
+   },
+   "[Google] Check Guest Exists": {
+    "__by_login": {
+     "gc.fail": {
+      "statusCode": 403,
+      "body": {
+       "error": {
+        "code": 403,
+        "message": "Not Authorized to access this resource/api"
+       }
+      }
+     }
+    }
+   },
+   "[Google] Check API Access": {
+    "statusCode": 403
+   }
+  },
+  "counts": {
+   "[Redmine] Update Ticket::close=True": 0,
+   "[Redmine] Update Ticket::close=False": 1
+  },
+  "has": {
+   "[Redmine] Update Ticket::close=False": [
+    {
+     "note": "~перевірити не вдалося (403)"
+    }
+   ]
+  }
+ },
+ {
+  "name": "кілька акаунтів: коментар, нічого не блокуємо",
+  "stubs": {
+   "[Redmine] Get Open Leaver Tickets": [
+    {
+     "issues": [
+      {
+       "id": 113,
+       "tracker": {
+        "id": 41,
+        "name": "GA | Leaver"
+       },
+       "status": {
+        "id": 1,
+        "name": "New"
+       },
+       "subject": "GA | Leaver | Тестовий Користувач Іванович | ",
+       "description": "В системі HRIS створено запит на розірвання договору. \r\n        ГА - Тестовий Користувач Іванович \r\n        AD - dup.user \r\n        тел: +380000000113 \r\n        Автор запиту - t.author\r\n        Заборгованості по техніці немає \r\n",
+       "custom_fields": [
+        {
+         "id": 30,
+         "name": "Termination date",
+         "value": "$YESTERDAY"
+        }
+       ]
+      }
+     ],
+     "total_count": 1,
+     "offset": 0,
+     "limit": 100
+    }
+   ],
+   "[AD] Search User": {
+    "__by_login": {
+     "dup.user": [
+      {
+       "dn": "CN=Dup1,OU=AllUsers,OU=COMPANY,DC=example,DC=com",
+       "userAccountControl": "512"
+      },
+      {
+       "dn": "CN=Dup2,OU=AllUsers,OU=COMPANY,DC=example,DC=com",
+       "userAccountControl": "512"
+      }
+     ]
+    }
+   },
+   "[Google] Check API Access": {
+    "statusCode": 200
+   }
+  },
+  "counts": {
+   "[AD] Disable Account": 0,
+   "[Redmine] Update Ticket::close=False": 1
+  },
+  "has": {
+   "[Redmine] Update Ticket::close=False": [
+    {
+     "note": "~кілька акаунтів"
+    }
+   ]
+  }
+ },
+ {
+  "name": "поза OU=AllUsers: не блокуємо, коментар",
+  "stubs": {
+   "[Redmine] Get Open Leaver Tickets": [
+    {
+     "issues": [
+      {
+       "id": 114,
+       "tracker": {
+        "id": 41,
+        "name": "GA | Leaver"
+       },
+       "status": {
+        "id": 1,
+        "name": "New"
+       },
+       "subject": "GA | Leaver | Тестовий Користувач Іванович | ",
+       "description": "В системі HRIS створено запит на розірвання договору. \r\n        ГА - Тестовий Користувач Іванович \r\n        AD - admin.user \r\n        тел: +380000000114 \r\n        Автор запиту - t.author\r\n        Заборгованості по техніці немає \r\n",
+       "custom_fields": [
+        {
+         "id": 30,
+         "name": "Termination date",
+         "value": "$YESTERDAY"
+        }
+       ]
+      }
+     ],
+     "total_count": 1,
+     "offset": 0,
+     "limit": 100
+    }
+   ],
+   "[AD] Search User": {
+    "__by_login": {
+     "admin.user": [
+      {
+       "dn": "CN=Admin,OU=Admins,OU=COMPANY,DC=example,DC=com",
+       "userAccountControl": "512"
+      }
+     ]
+    }
+   },
+   "[Google] Check API Access": {
+    "statusCode": 200
+   }
+  },
+  "counts": {
+   "[AD] Disable Account": 0,
+   "[Google] Delete Guest": 0,
+   "[Redmine] Update Ticket::close=False": 1
+  },
+  "has": {
+   "[Redmine] Update Ticket::close=False": [
+    {
+     "note": "~поза OU=AllUsers"
+    }
+   ]
+  }
+ },
+ {
+  "name": "уже в «Уволенные» і заблокований: AD пропускаємо, Google видаляємо, закриваємо",
+  "stubs": {
+   "[Redmine] Get Open Leaver Tickets": [
+    {
+     "issues": [
+      {
+       "id": 115,
+       "tracker": {
+        "id": 41,
+        "name": "GA | Leaver"
+       },
+       "status": {
+        "id": 1,
+        "name": "New"
+       },
+       "subject": "GA | Leaver | Тестовий Користувач Іванович | ",
+       "description": "В системі HRIS створено запит на розірвання договору. \r\n        ГА - Тестовий Користувач Іванович \r\n        AD - done.user \r\n        тел: +380000000115 \r\n        Автор запиту - t.author\r\n        Заборгованості по техніці немає \r\n",
+       "custom_fields": [
+        {
+         "id": 30,
+         "name": "Termination date",
+         "value": "$YESTERDAY"
+        }
+       ]
+      }
+     ],
+     "total_count": 1,
+     "offset": 0,
+     "limit": 100
+    }
+   ],
+   "[AD] Search User": {
+    "__by_login": {
+     "done.user": [
+      {
+       "dn": "CN=Done,OU=Уволенные,DC=example,DC=com",
+       "userAccountControl": "514"
+      }
+     ]
+    }
+   },
+   "[Google] Delete Guest": {
+    "__by_login": {
+     "done.user": {
+      "statusCode": 204,
+      "body": ""
+     }
+    }
+   },
+   "[Google] Check API Access": {
+    "statusCode": 200
+   }
+  },
+  "counts": {
+   "[AD] Disable Account": 0,
+   "[AD] Move to Fired OU": 0,
+   "[Google] Delete Guest": 1,
+   "[Redmine] Update Ticket::close=True": 1
+  },
+  "has": {
+   "[Redmine] Update Ticket::close=True": [
+    {
+     "note": "~уже був заблокований"
+    }
+   ]
+  }
+ },
+ {
+  "name": "в «Уволенные», але активний: коментар для ручної дії",
+  "stubs": {
+   "[Redmine] Get Open Leaver Tickets": [
+    {
+     "issues": [
+      {
+       "id": 116,
+       "tracker": {
+        "id": 41,
+        "name": "GA | Leaver"
+       },
+       "status": {
+        "id": 1,
+        "name": "New"
+       },
+       "subject": "GA | Leaver | Тестовий Користувач Іванович | ",
+       "description": "В системі HRIS створено запит на розірвання договору. \r\n        ГА - Тестовий Користувач Іванович \r\n        AD - half.user \r\n        тел: +380000000116 \r\n        Автор запиту - t.author\r\n        Заборгованості по техніці немає \r\n",
+       "custom_fields": [
+        {
+         "id": 30,
+         "name": "Termination date",
+         "value": "$YESTERDAY"
+        }
+       ]
+      }
+     ],
+     "total_count": 1,
+     "offset": 0,
+     "limit": 100
+    }
+   ],
+   "[AD] Search User": {
+    "__by_login": {
+     "half.user": [
+      {
+       "dn": "CN=Half,OU=Уволенные,DC=example,DC=com",
+       "userAccountControl": "512"
+      }
+     ]
+    }
+   },
+   "[Google] Check API Access": {
+    "statusCode": 200
+   }
+  },
+  "counts": {
+   "[AD] Disable Account": 0,
+   "[Google] Delete Guest": 0,
+   "[Redmine] Update Ticket::close=False": 1
+  },
+  "has": {
+   "[Redmine] Update Ticket::close=False": [
+    {
+     "note": "~не заблокований"
+    }
+   ]
+  }
+ },
+ {
+  "name": "гостя не було (404): закриваємо",
+  "stubs": {
+   "[Redmine] Get Open Leaver Tickets": [
+    {
+     "issues": [
+      {
+       "id": 117,
+       "tracker": {
+        "id": 41,
+        "name": "GA | Leaver"
+       },
+       "status": {
+        "id": 1,
+        "name": "New"
+       },
+       "subject": "GA | Leaver | Тестовий Користувач Іванович | ",
+       "description": "В системі HRIS створено запит на розірвання договору. \r\n        ГА - Тестовий Користувач Іванович \r\n        AD - noguest.user \r\n        тел: +380000000117 \r\n        Автор запиту - t.author\r\n        Заборгованості по техніці немає \r\n",
+       "custom_fields": [
+        {
+         "id": 30,
+         "name": "Termination date",
+         "value": "$YESTERDAY"
+        }
+       ]
+      }
+     ],
+     "total_count": 1,
+     "offset": 0,
+     "limit": 100
+    }
+   ],
+   "[AD] Search User": {
+    "__by_login": {
+     "noguest.user": [
+      {
+       "dn": "CN=NoGuest,OU=AllUsers,OU=COMPANY,DC=example,DC=com",
+       "userAccountControl": "512"
+      }
+     ]
+    }
+   },
+   "[Google] Delete Guest": {
+    "__by_login": {
+     "noguest.user": {
+      "statusCode": 404,
+      "body": {
+       "error": {
+        "code": 404,
+        "message": "Resource Not Found: userKey"
+       }
+      }
+     }
+    }
+   },
+   "[Google] Check API Access": {
+    "statusCode": 200
+   }
+  },
+  "counts": {
+   "[Redmine] Update Ticket::close=True": 1,
+   "[Sheets] Add to Archive": 1
+  },
+  "has": {
+   "[Redmine] Update Ticket::close=True": [
+    {
+     "note": "~не було (404)"
+    }
+   ]
+  }
+ },
+ {
+  "name": "видалення гостя 403 і доступ працює: гостя не було, закриваємо",
+  "stubs": {
+   "[Redmine] Get Open Leaver Tickets": [
+    {
+     "issues": [
+      {
+       "id": 133,
+       "tracker": {
+        "id": 41,
+        "name": "GA | Leaver"
+       },
+       "status": {
+        "id": 1,
+        "name": "New"
+       },
+       "subject": "GA | Leaver | Тестовий Користувач Іванович | ",
+       "description": "В системі HRIS створено запит на розірвання договору. \r\n        ГА - Тестовий Користувач Іванович \r\n        AD - del.403 \r\n        тел: +380000000133 \r\n        Автор запиту - t.author\r\n        Заборгованості по техніці немає \r\n",
+       "custom_fields": [
+        {
+         "id": 30,
+         "name": "Termination date",
+         "value": "$YESTERDAY"
+        }
+       ]
+      }
+     ],
+     "total_count": 1,
+     "offset": 0,
+     "limit": 100
+    }
+   ],
+   "[AD] Search User": {
+    "__by_login": {
+     "del.403": [
+      {
+       "dn": "CN=Del403,OU=AllUsers,OU=COMPANY,DC=example,DC=com",
+       "userAccountControl": "512"
+      }
+     ]
+    }
+   },
+   "[Google] Delete Guest": {
+    "__by_login": {
+     "del.403": {
+      "statusCode": 403,
+      "body": {
+       "error": {
+        "code": 403,
+        "message": "Not Authorized to access this resource/api"
+       }
+      }
+     }
+    }
+   },
+   "[Google] Check API Access": {
+    "statusCode": 200
+   }
+  },
+  "counts": {
+   "[Redmine] Update Ticket::close=True": 1
+  },
+  "has": {
+   "[Redmine] Update Ticket::close=True": [
+    {
+     "note": "~не було (403)"
+    }
+   ]
+  }
+ },
+ {
+  "name": "Google 403 при непрацюючому доступі: заявка відкрита, коментар з причиною",
+  "stubs": {
+   "[Redmine] Get Open Leaver Tickets": [
+    {
+     "issues": [
+      {
+       "id": 118,
+       "tracker": {
+        "id": 41,
+        "name": "GA | Leaver"
+       },
+       "status": {
+        "id": 1,
+        "name": "New"
+       },
+       "subject": "GA | Leaver | Тестовий Користувач Іванович | ",
+       "description": "В системі HRIS створено запит на розірвання договору. \r\n        ГА - Тестовий Користувач Іванович \r\n        AD - gw.fail \r\n        тел: +380000000118 \r\n        Автор запиту - t.author\r\n        Заборгованості по техніці немає \r\n",
+       "custom_fields": [
+        {
+         "id": 30,
+         "name": "Termination date",
+         "value": "$YESTERDAY"
+        }
+       ]
+      }
+     ],
+     "total_count": 1,
+     "offset": 0,
+     "limit": 100
+    }
+   ],
+   "[AD] Search User": {
+    "__by_login": {
+     "gw.fail": [
+      {
+       "dn": "CN=GwFail,OU=AllUsers,OU=COMPANY,DC=example,DC=com",
+       "userAccountControl": "512"
+      }
+     ]
+    }
+   },
+   "[Google] Delete Guest": {
+    "__by_login": {
+     "gw.fail": {
+      "statusCode": 403,
+      "body": {
+       "error": {
+        "code": 403,
+        "message": "Not Authorized to access this resource/api"
+       }
+      }
+     }
+    }
+   },
+   "[Google] Check API Access": {
+    "statusCode": 403
+   }
+  },
+  "counts": {
+   "[Redmine] Update Ticket::close=True": 0,
+   "[Sheets] Add to Archive": 0,
+   "[Redmine] Update Ticket::close=False": 1
+  },
+  "has": {
+   "[Redmine] Update Ticket::close=False": [
+    {
+     "id": 118,
+     "note": "~НЕ видалено (403): Not Authorized"
+    }
+   ]
+  }
+ },
+ {
+  "name": "помилка LDAP update: коментар ad_error, Google не чіпаємо",
+  "stubs": {
+   "[Redmine] Get Open Leaver Tickets": [
+    {
+     "issues": [
+      {
+       "id": 119,
+       "tracker": {
+        "id": 41,
+        "name": "GA | Leaver"
+       },
+       "status": {
+        "id": 1,
+        "name": "New"
+       },
+       "subject": "GA | Leaver | Тестовий Користувач Іванович | ",
+       "description": "В системі HRIS створено запит на розірвання договору. \r\n        ГА - Тестовий Користувач Іванович \r\n        AD - ldap.fail \r\n        тел: +380000000119 \r\n        Автор запиту - t.author\r\n        Заборгованості по техніці немає \r\n",
+       "custom_fields": [
+        {
+         "id": 30,
+         "name": "Termination date",
+         "value": "$YESTERDAY"
+        }
+       ]
+      }
+     ],
+     "total_count": 1,
+     "offset": 0,
+     "limit": 100
+    }
+   ],
+   "[AD] Search User": {
+    "__by_login": {
+     "ldap.fail": [
+      {
+       "dn": "CN=LdapFail,OU=AllUsers,OU=COMPANY,DC=example,DC=com",
+       "userAccountControl": "512"
+      }
+     ]
+    }
+   },
+   "[AD] Disable Account": {
+    "__by_login": {
+     "ldap.fail": {
+      "__throw": "Insufficient access rights"
+     }
+    }
+   },
+   "[Google] Check API Access": {
+    "statusCode": 200
+   }
+  },
+  "counts": {
+   "[AD] Move to Fired OU": 0,
+   "[Google] Delete Guest": 0,
+   "[Redmine] Update Ticket::close=False": 1
+  },
+  "has": {
+   "[Redmine] Update Ticket::close=False": [
+    {
+     "note": "~Insufficient access rights"
+    }
+   ]
+  }
+ },
+ {
+  "name": "помилка LDAP rename: коментар ad_error",
+  "stubs": {
+   "[Redmine] Get Open Leaver Tickets": [
+    {
+     "issues": [
+      {
+       "id": 120,
+       "tracker": {
+        "id": 41,
+        "name": "GA | Leaver"
+       },
+       "status": {
+        "id": 1,
+        "name": "New"
+       },
+       "subject": "GA | Leaver | Тестовий Користувач Іванович | ",
+       "description": "В системі HRIS створено запит на розірвання договору. \r\n        ГА - Тестовий Користувач Іванович \r\n        AD - mv.fail \r\n        тел: +380000000120 \r\n        Автор запиту - t.author\r\n        Заборгованості по техніці немає \r\n",
+       "custom_fields": [
+        {
+         "id": 30,
+         "name": "Termination date",
+         "value": "$YESTERDAY"
+        }
+       ]
+      }
+     ],
+     "total_count": 1,
+     "offset": 0,
+     "limit": 100
+    }
+   ],
+   "[AD] Search User": {
+    "__by_login": {
+     "mv.fail": [
+      {
+       "dn": "CN=MvFail,OU=AllUsers,OU=COMPANY,DC=example,DC=com",
+       "userAccountControl": "512"
+      }
+     ]
+    }
+   },
+   "[AD] Move to Fired OU": {
+    "__by_login": {
+     "mv.fail": {
+      "__throw": "No such object"
+     }
+    }
+   },
+   "[Google] Check API Access": {
+    "statusCode": 200
+   }
+  },
+  "counts": {
+   "[Google] Delete Guest": 0,
+   "[Redmine] Update Ticket::close=False": 1
+  },
+  "has": {
+   "[Redmine] Update Ticket::close=False": [
+    {
+     "note": "~No such object"
+    }
+   ]
+  }
+ },
+ {
+  "name": "кілька заявок: ненайдений не зупиняє обробку решти",
+  "stubs": {
+   "[Redmine] Get Open Leaver Tickets": [
+    {
+     "issues": [
+      {
+       "id": 121,
+       "tracker": {
+        "id": 41,
+        "name": "GA | Leaver"
+       },
+       "status": {
+        "id": 1,
+        "name": "New"
+       },
+       "subject": "GA | Leaver | Тестовий Користувач Іванович | ",
+       "description": "В системі HRIS створено запит на розірвання договору. \r\n        ГА - Тестовий Користувач Іванович \r\n        AD - a.one \r\n        тел: +380000000121 \r\n        Автор запиту - t.author\r\n        Заборгованості по техніці немає \r\n",
+       "custom_fields": [
+        {
+         "id": 30,
+         "name": "Termination date",
+         "value": "$YESTERDAY"
+        }
+       ]
+      },
+      {
+       "id": 122,
+       "tracker": {
+        "id": 41,
+        "name": "GA | Leaver"
+       },
+       "status": {
+        "id": 1,
+        "name": "New"
+       },
+       "subject": "GA | Leaver | Тестовий Користувач Іванович | ",
+       "description": "В системі HRIS створено запит на розірвання договору. \r\n        ГА - Тестовий Користувач Іванович \r\n        AD - b.ghost \r\n        тел: +380000000122 \r\n        Автор запиту - t.author\r\n        Заборгованості по техніці немає \r\n",
+       "custom_fields": [
+        {
+         "id": 30,
+         "name": "Termination date",
+         "value": "$YESTERDAY"
+        }
+       ]
+      },
+      {
+       "id": 123,
+       "tracker": {
+        "id": 41,
+        "name": "GA | Leaver"
+       },
+       "status": {
+        "id": 1,
+        "name": "New"
+       },
+       "subject": "GA | Leaver | Тестовий Користувач Іванович | ",
+       "description": "В системі HRIS створено запит на розірвання договору. \r\n        ГА - Тестовий Користувач Іванович \r\n        AD - c.three \r\n        тел: +380000000123 \r\n        Автор запиту - t.author\r\n        Заборгованості по техніці немає \r\n",
+       "custom_fields": [
+        {
+         "id": 30,
+         "name": "Termination date",
+         "value": "$YESTERDAY"
+        }
+       ]
+      },
+      {
+       "id": 124,
+       "tracker": {
+        "id": 41,
+        "name": "GA | Leaver"
+       },
+       "status": {
+        "id": 1,
+        "name": "New"
+       },
+       "subject": "GA | Leaver |  | ",
+       "description": "В системі HRIS створено запит на розірвання договору. \r\n        ГА -  \r\n        AD -  \r\n        тел: +380000000124 \r\n        Автор запиту - t.author\r\n        Заборгованості по техніці немає \r\n",
+       "custom_fields": [
+        {
+         "id": 30,
+         "name": "Termination date",
+         "value": "$YESTERDAY"
+        }
+       ]
+      }
+     ],
+     "total_count": 4,
+     "offset": 0,
+     "limit": 100
+    }
+   ],
+   "[AD] Search User": {
+    "__by_login": {
+     "a.one": [
+      {
+       "dn": "CN=A,OU=AllUsers,OU=COMPANY,DC=example,DC=com",
+       "userAccountControl": "512"
+      }
+     ],
+     "c.three": [
+      {
+       "dn": "CN=C,OU=AllUsers,OU=COMPANY,DC=example,DC=com",
+       "userAccountControl": "512"
+      }
+     ]
+    }
+   },
+   "[Google] Delete Guest": {
+    "__by_login": {
+     "a.one": {
+      "statusCode": 204,
+      "body": ""
+     },
+     "c.three": {
+      "statusCode": 404,
+      "body": {
+       "error": {
+        "code": 404,
+        "message": "Resource Not Found: userKey"
+       }
+      }
+     }
+    }
+   },
+   "[Google] Check Guest Exists": {
+    "__by_login": {
+     "b.ghost": {
+      "statusCode": 404,
+      "body": {
+       "error": {
+        "code": 404,
+        "message": "Resource Not Found: userKey"
+       }
+      }
+     }
+    }
+   },
+   "[Google] Check API Access": {
+    "statusCode": 200
+   }
+  },
+  "counts": {
+   "[AD] Search User": 3,
+   "[Redmine] Update Ticket::close=True": 3,
+   "[Sheets] Add to Archive": 3,
+   "[Redmine] Update Ticket::close=False": 0,
+   "[Redmine] Comment Missing Data": 1
+  },
+  "has": {
+   "[Redmine] Update Ticket::close=True": [
+    {
+     "id": 121
+    },
+    {
+     "id": 122,
+     "note": "~видалено автоматично"
+    },
+    {
+     "id": 123
+    }
+   ],
+   "[Redmine] Comment Missing Data": [
+    {
+     "id": 124
+    }
+   ]
+  }
+ },
+ {
+  "name": "Redmine віддає кожну заявку окремим елементом",
+  "stubs": {
+   "[Redmine] Get Open Leaver Tickets": [
+    {
+     "id": 125,
+     "tracker": {
+      "id": 41,
+      "name": "GA | Leaver"
+     },
+     "status": {
+      "id": 1,
+      "name": "New"
+     },
+     "subject": "GA | Leaver | Тестовий Користувач Іванович | ",
+     "description": "В системі HRIS створено запит на розірвання договору. \r\n        ГА - Тестовий Користувач Іванович \r\n        AD - per.item \r\n        тел: +380000000125 \r\n        Автор запиту - t.author\r\n        Заборгованості по техніці немає \r\n",
+     "custom_fields": [
+      {
+       "id": 30,
+       "name": "Termination date",
+       "value": "$YESTERDAY"
+      }
+     ]
+    }
+   ],
+   "[AD] Search User": {
+    "__by_login": {
+     "per.item": [
+      {
+       "dn": "CN=PerItem,OU=AllUsers,OU=COMPANY,DC=example,DC=com",
+       "userAccountControl": "512"
+      }
+     ]
+    }
+   },
+   "[Google] Delete Guest": {
+    "__by_login": {
+     "per.item": {
+      "statusCode": 204,
+      "body": ""
+     }
+    }
+   },
+   "[Google] Check API Access": {
+    "statusCode": 200
+   }
+  },
+  "counts": {
+   "[Redmine] Update Ticket::close=True": 1
+  }
+ },
+ {
+  "name": "без спаму: та сама проблема двічі = один коментар, після виправлення обробка",
+  "steps": [
+   {
+    "stubs": {
+     "[Redmine] Get Open Leaver Tickets": [
+      {
+       "issues": [
+        {
+         "id": 126,
+         "tracker": {
+          "id": 41,
+          "name": "GA | Leaver"
+         },
+         "status": {
+          "id": 1,
+          "name": "New"
+         },
+         "subject": "GA | Leaver |  | ",
+         "description": "В системі HRIS створено запит на розірвання договору. \r\n        ГА -  \r\n        AD -  \r\n        тел: +380000000126 \r\n        Автор запиту - t.author\r\n        Заборгованості по техніці немає \r\n",
+         "custom_fields": [
+          {
+           "id": 30,
+           "name": "Termination date",
+           "value": "$YESTERDAY"
+          }
+         ]
+        }
+       ],
+       "total_count": 1,
+       "offset": 0,
+       "limit": 100
+      }
+     ],
+     "[Google] Check API Access": {
+      "statusCode": 200
+     }
+    },
+    "counts": {
+     "[Redmine] Comment Missing Data": 1
+    }
+   },
+   {
+    "stubs": {
+     "[Redmine] Get Open Leaver Tickets": [
+      {
+       "issues": [
+        {
+         "id": 126,
+         "tracker": {
+          "id": 41,
+          "name": "GA | Leaver"
+         },
+         "status": {
+          "id": 1,
+          "name": "New"
+         },
+         "subject": "GA | Leaver |  | ",
+         "description": "В системі HRIS створено запит на розірвання договору. \r\n        ГА -  \r\n        AD -  \r\n        тел: +380000000126 \r\n        Автор запиту - t.author\r\n        Заборгованості по техніці немає \r\n",
+         "custom_fields": [
+          {
+           "id": 30,
+           "name": "Termination date",
+           "value": "$YESTERDAY"
+          }
+         ]
+        }
+       ],
+       "total_count": 1,
+       "offset": 0,
+       "limit": 100
+      }
+     ],
+     "[Google] Check API Access": {
+      "statusCode": 200
+     }
+    },
+    "counts": {
+     "[Redmine] Comment Missing Data": 0,
+     "[AD] Search User": 0
+    }
+   },
+   {
+    "stubs": {
+     "[Redmine] Get Open Leaver Tickets": [
+      {
+       "issues": [
+        {
+         "id": 126,
+         "tracker": {
+          "id": 41,
+          "name": "GA | Leaver"
+         },
+         "status": {
+          "id": 1,
+          "name": "New"
+         },
+         "subject": "GA | Leaver | Тестовий Користувач Іванович | ",
+         "description": "В системі HRIS створено запит на розірвання договору. \r\n        ГА - Тестовий Користувач Іванович \r\n        AD - fixed.user \r\n        тел: +380000000126 \r\n        Автор запиту - t.author\r\n        Заборгованості по техніці немає \r\n",
+         "custom_fields": [
+          {
+           "id": 30,
+           "name": "Termination date",
+           "value": "$YESTERDAY"
+          }
+         ]
+        }
+       ],
+       "total_count": 1,
+       "offset": 0,
+       "limit": 100
+      }
+     ],
+     "[AD] Search User": {
+      "__by_login": {
+       "fixed.user": [
+        {
+         "dn": "CN=Fixed,OU=AllUsers,OU=COMPANY,DC=example,DC=com",
+         "userAccountControl": "512"
+        }
+       ]
+      }
+     },
+     "[Google] Delete Guest": {
+      "__by_login": {
+       "fixed.user": {
+        "statusCode": 204,
+        "body": ""
+       }
+      }
+     },
+     "[Google] Check API Access": {
+      "statusCode": 200
+     }
+    },
+    "counts": {
+     "[Redmine] Comment Missing Data": 0,
+     "[Redmine] Update Ticket::close=True": 1
+    }
+   }
+  ]
+ },
+ {
+  "name": "без спаму: Google 500 два дні = один коментар; потім AD already_done і закриття",
+  "steps": [
+   {
+    "stubs": {
+     "[Redmine] Get Open Leaver Tickets": [
+      {
+       "issues": [
+        {
+         "id": 127,
+         "tracker": {
+          "id": 41,
+          "name": "GA | Leaver"
+         },
+         "status": {
+          "id": 1,
+          "name": "New"
+         },
+         "subject": "GA | Leaver | Тестовий Користувач Іванович | ",
+         "description": "В системі HRIS створено запит на розірвання договору. \r\n        ГА - Тестовий Користувач Іванович \r\n        AD - gw.retry \r\n        тел: +380000000127 \r\n        Автор запиту - t.author\r\n        Заборгованості по техніці немає \r\n",
+         "custom_fields": [
+          {
+           "id": 30,
+           "name": "Termination date",
+           "value": "$YESTERDAY"
+          }
+         ]
+        }
+       ],
+       "total_count": 1,
+       "offset": 0,
+       "limit": 100
+      }
+     ],
+     "[AD] Search User": {
+      "__by_login": {
+       "gw.retry": [
+        {
+         "dn": "CN=GwRetry,OU=AllUsers,OU=COMPANY,DC=example,DC=com",
+         "userAccountControl": "512"
+        }
+       ]
+      }
+     },
+     "[Google] Delete Guest": {
+      "__by_login": {
+       "gw.retry": {
+        "statusCode": 500,
+        "body": {
+         "error": {
+          "code": 500,
+          "message": "Backend Error"
+         }
+        }
+       }
+      }
+     },
+     "[Google] Check API Access": {
+      "statusCode": 200
+     }
+    },
+    "counts": {
+     "[Redmine] Update Ticket::close=False": 1,
+     "[AD] Disable Account": 1
+    }
+   },
+   {
+    "stubs": {
+     "[Redmine] Get Open Leaver Tickets": [
+      {
+       "issues": [
+        {
+         "id": 127,
+         "tracker": {
+          "id": 41,
+          "name": "GA | Leaver"
+         },
+         "status": {
+          "id": 1,
+          "name": "New"
+         },
+         "subject": "GA | Leaver | Тестовий Користувач Іванович | ",
+         "description": "В системі HRIS створено запит на розірвання договору. \r\n        ГА - Тестовий Користувач Іванович \r\n        AD - gw.retry \r\n        тел: +380000000127 \r\n        Автор запиту - t.author\r\n        Заборгованості по техніці немає \r\n",
+         "custom_fields": [
+          {
+           "id": 30,
+           "name": "Termination date",
+           "value": "$YESTERDAY"
+          }
+         ]
+        }
+       ],
+       "total_count": 1,
+       "offset": 0,
+       "limit": 100
+      }
+     ],
+     "[AD] Search User": {
+      "__by_login": {
+       "gw.retry": [
+        {
+         "dn": "CN=GwRetry,OU=Уволенные,DC=example,DC=com",
+         "userAccountControl": "514"
+        }
+       ]
+      }
+     },
+     "[Google] Delete Guest": {
+      "__by_login": {
+       "gw.retry": {
+        "statusCode": 500,
+        "body": {
+         "error": {
+          "code": 500,
+          "message": "Backend Error"
+         }
+        }
+       }
+      }
+     },
+     "[Google] Check API Access": {
+      "statusCode": 200
+     }
+    },
+    "counts": {
+     "[Redmine] Update Ticket::close=False": 0,
+     "[AD] Disable Account": 0,
+     "[Google] Delete Guest": 1
+    }
+   },
+   {
+    "stubs": {
+     "[Redmine] Get Open Leaver Tickets": [
+      {
+       "issues": [
+        {
+         "id": 127,
+         "tracker": {
+          "id": 41,
+          "name": "GA | Leaver"
+         },
+         "status": {
+          "id": 1,
+          "name": "New"
+         },
+         "subject": "GA | Leaver | Тестовий Користувач Іванович | ",
+         "description": "В системі HRIS створено запит на розірвання договору. \r\n        ГА - Тестовий Користувач Іванович \r\n        AD - gw.retry \r\n        тел: +380000000127 \r\n        Автор запиту - t.author\r\n        Заборгованості по техніці немає \r\n",
+         "custom_fields": [
+          {
+           "id": 30,
+           "name": "Termination date",
+           "value": "$YESTERDAY"
+          }
+         ]
+        }
+       ],
+       "total_count": 1,
+       "offset": 0,
+       "limit": 100
+      }
+     ],
+     "[AD] Search User": {
+      "__by_login": {
+       "gw.retry": [
+        {
+         "dn": "CN=GwRetry,OU=Уволенные,DC=example,DC=com",
+         "userAccountControl": "514"
+        }
+       ]
+      }
+     },
+     "[Google] Delete Guest": {
+      "__by_login": {
+       "gw.retry": {
+        "statusCode": 204,
+        "body": ""
+       }
+      }
+     },
+     "[Google] Check API Access": {
+      "statusCode": 200
+     }
+    },
+    "counts": {
+     "[Redmine] Update Ticket::close=True": 1
+    }
+   }
+  ]
+ }
+]

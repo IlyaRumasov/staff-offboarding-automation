@@ -1,0 +1,914 @@
+{
+  "name": "[PROD] Redmine & AD Offboarding Automation (Linear Staff)",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 18 * * *"
+            }
+          ]
+        }
+      },
+      "id": "c76c23d3-e05d-5139-8321-d7d11077ecc4",
+      "name": "Every Day 18:00",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://admin.googleapis.com/admin/directory/v1/users?domain=tenant.example.org&maxResults=1",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleApi",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          }
+        }
+      },
+      "id": "21b4ac61-a286-5b07-9b79-34d59d79618a",
+      "name": "[Google] Check API Access",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        250,
+        0
+      ],
+      "onError": "continueRegularOutput",
+      "credentials": {
+        "googleApi": {
+          "id": "<GW_CRED>",
+          "name": "Google service account (guests)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "returnAll": true,
+        "filters": {
+          "tracker_id": "41",
+          "status_id": "open"
+        },
+        "options": {}
+      },
+      "id": "406eddcf-2c7b-5ca2-86b5-c65f5588bf26",
+      "name": "[Redmine] Get Open Leaver Tickets",
+      "type": "n8n-nodes-redmine.redmine",
+      "typeVersion": 1,
+      "position": [
+        500,
+        0
+      ],
+      "credentials": {
+        "redmineApi": {
+          "id": "<REDMINE_CRED>",
+          "name": "Redmine bot account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Розбір заявок «GA | Leaver» (трекер 41): AD-логін, дата звільнення, гостьова пошта Google.\n// Вихід: action = 'process' (готово до обробки) або 'notify' (у заявці бракує даних, треба коментар).\n// Коментар про ту саму проблему пишеться один раз (пам'ять у static data флоу).\nconst TRACKER_ID = 41;\nconst LOGIN_CF_ID = 87;      // кастомне поле «AD login»\nconst TERM_DATE_CF_ID = 30;  // кастомне поле «Termination date»\nconst LOGIN_RE = /^[A-Za-z0-9][A-Za-z0-9._-]*(@[A-Za-z0-9.-]+\\.[A-Za-z]{2,})?$/;\n\nconst state = $getWorkflowStaticData('global');\nstate.notified_input = state.notified_input || {};\nstate.notified_run = state.notified_run || {};\n\nconst today = DateTime.now().setZone('Europe/Kyiv').toISODate();\n// Доступ до Google API працює? Тоді 403 на конкретного гостя означає «гостя немає» (див. final_report.js).\nconst hc = $('[Google] Check API Access').first().json;\nconst gw_ok = Number(hc.statusCode) === 200;\n\nlet issues = [];\nfor (const it of $input.all()) {\n  if (Array.isArray(it.json.issues)) issues.push(...it.json.issues);\n  else if (it.json && it.json.id) issues.push(it.json);\n}\n\nconst cf = (issue, id, name) => (issue.custom_fields || []).find(f => f.id === id || f.name === name);\n\n// Транслітерація за постановою КМУ №55 (2010), як імена записані в AD (Зразковий Олег -> Zrazkovyi Oleh).\nconst TR = { а:'a', б:'b', в:'v', г:'h', ґ:'g', д:'d', е:'e', є:'ie', ж:'zh', з:'z', и:'y', і:'i', ї:'i', й:'i', к:'k', л:'l',\n  м:'m', н:'n', о:'o', п:'p', р:'r', с:'s', т:'t', у:'u', ф:'f', х:'kh', ц:'ts', ч:'ch', ш:'sh', щ:'shch', ь:'', ю:'iu', я:'ia',\n  ы:'y', э:'e', ё:'io', ъ:'' };\nconst TR_START = { є:'ye', ї:'yi', й:'y', ю:'yu', я:'ya', ё:'yo' };\nfunction translit(word) {\n  const w = word.toLowerCase().replace(/[’'ʼ`]/g, '').replace(/зг/g, 'zgh');\n  let out = '';\n  for (let i = 0; i < w.length; i++) {\n    const c = w[i];\n    out += (i === 0 && TR_START[c]) || (TR[c] !== undefined ? TR[c] : c);\n  }\n  return out.charAt(0).toUpperCase() + out.slice(1);\n}\n// Шаблони логінів в AD (запасний пошук, якщо в акаунта не заповнені ім'я/прізвище):\n// ім'я.прізвище, і.прізвище, ms.і.прізвище, ms.ім'я.прізвище (ms. у старих акаунтів).\nconst loginVariants = (g, s) => {\n  const G = g.toLowerCase().replace(/[^a-z-]/g, ''), S = s.toLowerCase().replace(/[^a-z-]/g, '');\n  if (!G || !S) return [];\n  return [`${G}.${S}`, `${G[0]}.${S}`, `ms.${G[0]}.${S}`, `ms.${G}.${S}`];\n};\nconst ldapEsc = s => s.replace(/[\\\\*()\\0]/g, c => '\\\\' + c.charCodeAt(0).toString(16).padStart(2, '0'));\n\nfunction parseName(issue) {\n  // Рядок «ГА - Прізвище Ім'я По батькові» в описі, інакше третій сегмент теми «GA | Leaver | ПІБ | дата».\n  const m = (issue.description || '').match(/(?:^|[\\s|])ГА[ \\t]*[-–—:][ \\t]*([^\\r\\n]*)/);\n  const fio = ((m && m[1]) || (issue.subject || '').split('|')[2] || '').trim().replace(/^(ФОП|ФЛП)\\s+/i, '');\n  const parts = fio.split(/\\s+/).filter(p => /^[А-Яа-яЁёЄєІіЇїҐґ’'ʼ-]+$/.test(p));\n  if (parts.length < 2) return null;\n  return { fio, sn: translit(parts[0]), gn: translit(parts[1]) };\n}\n\nfunction parseLogin(issue) {\n  // Рядок «AD - login» в описі. [ \\t]* замість \\s*, щоб не перескочити на наступний рядок.\n  const m = (issue.description || '').match(/(?:^|[\\s|])AD[ \\t]*[-–—:][ \\t]*([^\\r\\n]*)/i);\n  let raw = m ? m[1].trim() : '';\n  if (!raw) {\n    const f = cf(issue, LOGIN_CF_ID, 'AD login');\n    raw = f && f.value ? String(f.value).trim() : '';\n  }\n  if (!raw) return { reason: 'no_login' };\n  const login = raw.split(/\\s+/)[0];\n  if (!LOGIN_RE.test(login)) return { reason: 'bad_login', value: raw };\n  return { login };\n}\n\nfunction parseDate(issue) {\n  const f = cf(issue, TERM_DATE_CF_ID, 'Termination date');\n  let d = (f && f.value) || issue.due_date || ((issue.subject || '').match(/(\\d{4}-\\d{2}-\\d{2})/) || [])[1] || '';\n  d = String(d).trim();\n  if (!d) return { reason: 'no_date' };\n  if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(d) || !DateTime.fromISO(d).isValid) return { reason: 'bad_date', value: d };\n  return { date: d };\n}\n\n// [що перевірено, результат, що робити далі]\nconst NOTES = {\n  no_login: () => ['• Рядок «AD -» в описі: порожній.\\n• Поле «AD login»: порожнє.\\n• ПІБ (рядок «ГА -» або тема заявки): не знайдено, тому пошук в AD за ПІБ неможливий.',\n    'AD-логін не вказано, і знайти працівника в AD немає за чим.',\n    ['впишіть логін у рядок «AD -» (або ПІБ у рядок «ГА -»), і автоматизація обробить заявку сама;',\n     'якщо акаунта в AD немає, перевірте гостьовий акаунт Google і закрийте заявку вручну.']],\n  bad_login: v => [`• Рядок «AD -» в описі: «${v}».`,\n    `AD-логін «${v}» має неприпустимий формат (очікується латиниця без пробілів, наприклад ivan.petrenko).`,\n    ['виправте логін у рядку «AD -», і автоматизація обробить заявку сама.']],\n  no_date: () => ['• Поле «Termination date»: порожнє.\\n• Due date: порожня.\\n• Дата в темі заявки (РРРР-ММ-ДД): немає.',\n    'не вказано дату звільнення, тому невідомо, коли закривати доступи.',\n    ['заповніть «Termination date» (РРРР-ММ-ДД); у день звільнення або пізніше автоматизація обробить заявку сама.']],\n  bad_date: v => [`• Дата звільнення в заявці: «${v}».`,\n    `дату «${v}» не вдалося розпізнати (очікується формат РРРР-ММ-ДД).`,\n    ['виправте дату в полі «Termination date», і автоматизація обробить заявку сама.']],\n};\nconst fmt = ([checked, result, next]) =>\n  `⚠ Автоматичний offboarding не виконано.\\n\\nЩо перевірено:\\n${checked}\\n\\nРезультат: ${result}\\n\\n` +\n  `Що робити далі:\\n${next.map((s, i) => `${i + 1}. ${s.charAt(0).toUpperCase()}${s.slice(1)}`).join('\\n')}\\n\\n` +\n  'Заявку залишено відкритою. Нічого в AD і Google не змінено. Автоматизація перевіряє заявку щодня о 18:00; про ту саму проблему повторно не пише.';\n\nconst results = [];\nconst openIds = new Set();\nfor (const issue of issues) {\n  if (!issue || !issue.tracker || issue.tracker.id !== TRACKER_ID) continue;\n  const id = issue.id;\n  openIds.add(String(id));\n  let L = parseLogin(issue);\n  const D = parseDate(issue);\n\n  // Дата в майбутньому: просто чекаємо, нічого не пишемо.\n  if (D.date && D.date > today) continue;\n\n  // Логіна немає: шукатимемо в AD за ПІБ (рішення приймає Decide AD Action).\n  const N = L.reason === 'no_login' ? parseName(issue) : null;\n  if (N) L = { name: N };\n\n  const problem = L.reason ? L : (D.reason ? D : null);\n  if (problem) {\n    const key = problem.reason + ':' + (problem.value || '');\n    if (state.notified_input[id] === key) continue;\n    state.notified_input[id] = key;\n    results.push({ json: {\n      action: 'notify', id, reason: problem.reason, subject: issue.subject || '',\n      note: fmt(NOTES[problem.reason](problem.value)),\n    } });\n    continue;\n  }\n\n  delete state.notified_input[id];\n  if (L.name) {\n    results.push({ json: {\n      action: 'process', gw_ok, id, lookup: 'name', login: '', guest_email: '', leaver_date: D.date, subject: issue.subject || '',\n      fio: L.name.fio, sn: L.name.sn, gn: L.name.gn,\n      login_variants: loginVariants(L.name.gn, L.name.sn),\n      ldap_filter: `(&(objectClass=user)(|(sn=${ldapEsc(L.name.sn)})` +\n        loginVariants(L.name.gn, L.name.sn).map(v => `(sAMAccountName=${ldapEsc(v)})`).join('') + '))',\n    } });\n    continue;\n  }\n  const email = L.login.includes('@') ? L.login : `${L.login}@example.com`;\n  const sam = email.split('@')[0];\n  const guest = email.endsWith('.guest.google') ? email : `${email.replace('@', '_')}@tenant.example.org.guest.google`;\n  results.push({ json: {\n    action: 'process', gw_ok, id, lookup: 'login', login: sam, guest_email: guest, leaver_date: D.date, subject: issue.subject || '',\n    ldap_filter: `(&(objectClass=user)(sAMAccountName=${ldapEsc(sam)}))`,\n  } });\n}\n\n// Забуваємо закриті заявки.\nfor (const k of Object.keys(state.notified_input)) if (!openIds.has(k)) delete state.notified_input[k];\nfor (const k of Object.keys(state.notified_run)) if (!openIds.has(k)) delete state.notified_run[k];\n\nreturn results;\n"
+      },
+      "id": "7df911ab-7b04-54c0-8357-d15068035387",
+      "name": "Code: Parse Tickets",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        750,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "a2523691-41f6-5ec2-8eb6-b9948c406650",
+              "leftValue": "={{ $json.action === 'process' }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "9f5a1bc6-92bd-5611-b317-71c99be45969",
+      "name": "Ticket Ready?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1000,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "issueId": "={{ $json.id }}",
+        "notes": "={{ $json.note }}",
+        "additionalFields": {},
+        "options": {}
+      },
+      "id": "90382731-5c80-5220-9453-fd314777de40",
+      "name": "[Redmine] Comment Missing Data",
+      "type": "n8n-nodes-redmine.redmine",
+      "typeVersion": 1,
+      "position": [
+        1000,
+        172
+      ],
+      "credentials": {
+        "redmineApi": {
+          "id": "<REDMINE_CRED>",
+          "name": "Redmine bot account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "f9136b32-9daa-570e-8afd-3f6df362fc87",
+      "name": "Loop Over Tickets",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        1250,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "baseDN": "DC=example,DC=com",
+        "searchFor": "custom",
+        "customFilter": "={{ $json.ldap_filter }}",
+        "returnAll": true,
+        "options": {
+          "scope": "sub",
+          "attributes": [
+            "userAccountControl",
+            "sAMAccountName",
+            "givenName",
+            "sn",
+            "displayName",
+            "cn"
+          ]
+        }
+      },
+      "id": "289eec83-3a73-5c28-817a-8bc05f57f293",
+      "name": "[AD] Search User",
+      "type": "n8n-nodes-base.ldap",
+      "typeVersion": 1,
+      "position": [
+        1500,
+        0
+      ],
+      "alwaysOutputData": true,
+      "credentials": {
+        "ldap": {
+          "id": "<LDAP_CRED>",
+          "name": "LDAP service account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Що робити з акаунтом в AD за результатом пошуку (по всьому домену).\n// lookup = login: пошук за sAMAccountName; lookup = name: за прізвищем, далі звіряємо ім'я (логіна в заявці немає).\n// ad_status: disable | already_done | not_found | multiple | outside_scope | fired_but_enabled | name_not_found | name_multiple\nconst SCOPE = ',OU=AllUsers,OU=COMPANY,DC=example,DC=com';\nconst FIRED_OU = 'OU=Уволенные,DC=example,DC=com';\nconst ACCOUNTDISABLE = 2;\n\nconst leaver = $('Loop Over Tickets').first().json;\nconst one = v => Array.isArray(v) ? v[0] : v;\nconst low = v => String(one(v) || '').toLowerCase();\nconst endsWithCI = (s, tail) => s.toLowerCase().endsWith(tail.toLowerCase());\nlet found = $input.all().map(i => i.json).filter(j => j && j.dn);\n\nconst where = j => {\n  const dn = String(j.dn);\n  const uac = parseInt(one(j.userAccountControl), 10) || 0;\n  const ou = endsWithCI(dn, ',' + FIRED_OU) ? 'Уволенные' : (dn.match(/,OU=([^,]+)/) || [])[1] || '?';\n  return `${one(j.sAMAccountName)} (${ou}, ${(uac & ACCOUNTDISABLE) ? 'заблокований' : 'активний'})`;\n};\n\nlet out = { ...leaver, ad_status: '', dn: '', target_dn: '', new_uac: '', ad_matches: 0, candidates: '', found_by_name: false };\n\nif (leaver.lookup === 'name') {\n  const gn = leaver.gn.toLowerCase(), sn = leaver.sn.toLowerCase();\n  const sameSurname = found.filter(j => low(j.sn) === sn);\n  const byName = found.filter(j => low(j.givenName) === gn && low(j.sn) === sn);\n  // Запасний шлях: акаунт із логіном за шаблоном, у якого ім'я/прізвище порожні або збігаються.\n  const byLogin = found.filter(j => (leaver.login_variants || []).includes(low(j.sAMAccountName)) &&\n    (!low(j.givenName) || low(j.givenName) === gn) && (!low(j.sn) || low(j.sn) === sn));\n  found = byName.length ? byName : byLogin;\n  out.found_by_login_pattern = !byName.length && byLogin.length === 1;\n  if (found.length === 0) {\n    out.ad_status = 'name_not_found';\n    out.candidates = sameSurname.slice(0, 5).map(j => `${one(j.displayName) || one(j.cn)}: ${where(j)}`).join('; ');\n  } else if (found.length > 1) {\n    out.ad_status = 'name_multiple';\n    out.candidates = found.map(where).join('; ');\n  } else {\n    out.login = String(one(found[0].sAMAccountName));\n    out.guest_email = `${out.login}_example.com@tenant.example.org.guest.google`;\n    out.found_by_name = true;\n  }\n}\n\nout.ad_matches = found.length;\nif (!out.ad_status) {\n  if (found.length === 0) out.ad_status = 'not_found';\n  else if (found.length > 1) { out.ad_status = 'multiple'; out.candidates = found.map(where).join('; '); }\n  else {\n    const dn = String(found[0].dn);\n    const uac = parseInt(one(found[0].userAccountControl), 10) || 0;\n    const disabled = (uac & ACCOUNTDISABLE) === ACCOUNTDISABLE;\n    out.dn = dn;\n    if (endsWithCI(dn, ',' + FIRED_OU)) {\n      out.ad_status = disabled ? 'already_done' : 'fired_but_enabled';\n    } else if (endsWithCI(dn, SCOPE)) {\n      // RDN до першої неекранованої коми (CN=Petrenko\\, Ivan,OU=...).\n      const rdn = dn.match(/^((?:\\\\.|[^,\\\\])+),/)[1];\n      out.ad_status = 'disable';\n      out.new_uac = String(uac | ACCOUNTDISABLE);  // інші прапорці акаунта не чіпаємо\n      out.target_dn = `${rdn},${FIRED_OU}`;\n    } else {\n      out.ad_status = 'outside_scope';\n    }\n  }\n}\n\nreturn [{ json: out, pairedItem: { item: 0 } }];\n"
+      },
+      "id": "874ec52d-4cb8-5f71-88fc-cfed84c85cb8",
+      "name": "Code: Decide AD Action",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        0,
+        230
+      ]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "49d6be65-f6ca-54f8-9a24-f943b299343d",
+                    "leftValue": "={{ $json.ad_status }}",
+                    "rightValue": "disable",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "disable"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "06406e8e-c77d-5a27-a48f-c612571003cd",
+                    "leftValue": "={{ $json.ad_status }}",
+                    "rightValue": "already_done",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "already_done"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "f31dc2c1-dc39-5a54-aad5-a99b4b2e3268",
+                    "leftValue": "={{ $json.ad_status }}",
+                    "rightValue": "not_found",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "not_found"
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra",
+          "renameFallbackOutput": "problem"
+        }
+      },
+      "id": "33aad443-6e3a-521c-a7f5-501f095f8555",
+      "name": "Route by AD Status",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        250,
+        230
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "dn": "={{ $json.dn }}",
+        "attributes": {
+          "replace": [
+            {
+              "id": "userAccountControl",
+              "value": "={{ $json.new_uac }}"
+            }
+          ]
+        }
+      },
+      "id": "09296270-a6f7-54e4-af55-1e4348cf80b6",
+      "name": "[AD] Disable Account",
+      "type": "n8n-nodes-base.ldap",
+      "typeVersion": 1,
+      "position": [
+        500,
+        230
+      ],
+      "onError": "continueErrorOutput",
+      "credentials": {
+        "ldap": {
+          "id": "<LDAP_CRED>",
+          "name": "LDAP service account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "rename",
+        "dn": "={{ $('Code: Decide AD Action').item.json.dn }}",
+        "targetDn": "={{ $('Code: Decide AD Action').item.json.target_dn }}"
+      },
+      "id": "72c10642-5824-5be2-92ec-e6b124699b15",
+      "name": "[AD] Move to Fired OU",
+      "type": "n8n-nodes-base.ldap",
+      "typeVersion": 1,
+      "position": [
+        750,
+        230
+      ],
+      "onError": "continueErrorOutput",
+      "credentials": {
+        "ldap": {
+          "id": "<LDAP_CRED>",
+          "name": "LDAP service account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "DELETE",
+        "url": "=https://admin.googleapis.com/admin/directory/v1/users/{{ encodeURIComponent($('Code: Decide AD Action').item.json.guest_email) }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleApi",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          }
+        }
+      },
+      "id": "3c81519c-1c6c-5ec1-91ff-04a71603a3d3",
+      "name": "[Google] Delete Guest",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1000,
+        230
+      ],
+      "onError": "continueRegularOutput",
+      "credentials": {
+        "googleApi": {
+          "id": "<GW_CRED>",
+          "name": "Google service account (guests)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=https://admin.googleapis.com/admin/directory/v1/users/{{ encodeURIComponent($('Code: Decide AD Action').item.json.guest_email) }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleApi",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          }
+        }
+      },
+      "id": "e2300316-2073-5f15-b482-200a70a285fb",
+      "name": "[Google] Check Guest Exists",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1000,
+        460
+      ],
+      "onError": "continueRegularOutput",
+      "credentials": {
+        "googleApi": {
+          "id": "<GW_CRED>",
+          "name": "Google service account (guests)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Підсумок по заявці після кроку Google: текст звіту і рішення, чи закривати заявку.\n// Сюди приходить відповідь Google з двох гілок: видалення гостя (AD заблоковано або вже було) і перевірка гостя (в AD акаунта немає).\n// Закриваємо, якщо гостя видалено (2xx) або його не було (404, або 403 при робочому доступі до API). Інакше коментар, заявка відкрита;\n// наступного дня AD уже «already_done», тож повториться лише крок Google. Той самий коментар двічі не пишемо.\nconst d = $('Code: Decide AD Action').first().json;\nconst r = $input.first().json;\nconst state = $getWorkflowStaticData('global');\nstate.notified_run = state.notified_run || {};\n\nconst code = Number(r.statusCode || (r.error && (r.error.httpCode || r.error.status)) || 0);\n// Для сервісного акаунта «Google service account (guests)» неіснуючий гість дає 403, а не 404 (перевірено 14.10.2026:\n// наявний гість 200, вигаданий 403). Тому 403 = «гостя немає», лише якщо на початку запуску доступ до API працював.\nconst gone = code === 404 || (code === 403 && d.gw_ok === true);\nconst msg = (r.body && r.body.error && r.body.error.message) || (r.error && (r.error.message || r.error.description)) || r.statusMessage || 'невідома помилка';\nconst tail = 'Автоматизація перевіряє заявку щодня о 18:00; про ту саму проблему повторно не пише.';\nconst adminFix = '1. Перевірте права сервісного акаунта Google (User Management Admin) і ключ у кредах n8n «Google service account (guests)».\\n';\n\nlet out;\nif (d.ad_status === 'not_found') {\n  // Логін є, в AD акаунта немає. Гостя теж немає: записів ніде немає, імовірно видалено автоматично за неактивність.\n  const checkedAd = `• Active Directory: пошук за логіном «${d.login}» по всьому домену, включно з OU «Уволенные»: акаунта немає.`;\n  if (gone) {\n    delete state.notified_run[d.id];\n    out = { id: d.id, close: true, notify: false, login: d.login, guest_email: d.guest_email, leaver_date: d.leaver_date,\n      note: 'Автоматичний offboarding: доступів не знайдено, заявку закрито.\\n\\n' +\n            `Що перевірено:\\n${checkedAd}\\n• Google Workspace: гостьовий акаунт ${d.guest_email}: не існує (Google: ${code}).\\n\\n` +\n            'Висновок: записів про працівника немає ні в AD, ні в Google. Найімовірніше, акаунт було видалено автоматично ' +\n            'через тривалу неактивність. Закривати нічого.\\n\\n' +\n            'Архівування: запис додано до архівного реєстру Google Sheets.' };\n  } else {\n    const exists = code >= 200 && code < 300;\n    const key = exists ? 'nf_guest_exists' : 'nf_gw_error:' + code;\n    const notify = state.notified_run[d.id] !== key;\n    state.notified_run[d.id] = key;\n    out = { id: d.id, close: false, notify,\n      note: '⚠ Автоматичний offboarding не виконано.\\n\\n' +\n            `Що перевірено:\\n${checkedAd}\\n• Google Workspace: гостьовий акаунт ${d.guest_email}: ` +\n            (exists ? 'існує.' : `перевірити не вдалося (${code || 'немає відповіді'}): ${msg}.`) + '\\n\\n' +\n            (exists\n              ? 'Результат: в AD акаунта немає, а гостьовий акаунт у Google є. Так не має бути, тому автоматично нічого не видалено.\\n\\n' +\n                'Що робити далі:\\n1. Перевірте, чи правильний логін у рядку «AD -» (можлива помилка в логіні).\\n' +\n                '2. Якщо логін правильний, видаліть гостьовий акаунт вручну і закрийте заявку.\\n\\n'\n              : 'Результат: не вдалося перевірити Google, тому заявку не закрито.\\n\\n' +\n                `Що робити далі:\\n${adminFix}2. Автоматизація повторить перевірку під час наступного запуску.\\n\\n`) +\n            'Заявку залишено відкритою. Нічого в AD і Google не змінено. ' + tail };\n  }\n} else {\n  // AD заблоковано (щойно або раніше), результат видалення гостя.\n  let gw, gwOk;\n  if (code >= 200 && code < 300) { gw = 'Гостьовий запис видалено з домену.'; gwOk = true; }\n  else if (gone) { gw = `Гостьового запису не було (${code}), видаляти нічого.`; gwOk = true; }\n  else { gw = `НЕ видалено (${code || 'немає відповіді'}): ${msg}`; gwOk = false; }\n\n  const ad = d.ad_status === 'already_done'\n    ? 'Акаунт уже був заблокований і перебуває в OU «Уволенные».'\n    : 'Акаунт заблоковано та переміщено в OU «Уволенные».';\n  const body =\n    `1. Active Directory:\\n• Логін: ${d.login}` +\n    (d.found_by_name ? ` (у заявці не вказано, знайдено в AD за ПІБ «${d.fio}»: ${d.gn} ${d.sn}, єдиний збіг` +\n      (d.found_by_login_pattern ? '; ім’я/прізвище в AD не заповнені, знайдено за шаблоном логіна' : '') + ')' : '') +\n    `\\n• Статус: ${ad}\\n` +\n    `2. Google Workspace (Guest):\\n• Акаунт: ${d.guest_email}\\n• Статус: ${gw}\\n`;\n\n  if (gwOk) {\n    delete state.notified_run[d.id];\n    out = { id: d.id, close: true, notify: false, login: d.login, guest_email: d.guest_email, leaver_date: d.leaver_date,\n      note: `Автоматичний offboarding успішно завершено.\\nЗвіт про закриття доступів:\\n${body}` +\n            '3. Архівування:\\n• Запис додано до архівного реєстру Google Sheets.' };\n  } else {\n    const key = 'gw_error:' + code;\n    const notify = state.notified_run[d.id] !== key;\n    state.notified_run[d.id] = key;\n    const next = code === 403 || code === 401\n      ? adminFix\n      : '1. Перевірте гостьовий акаунт у консолі адміністратора Google Workspace і відповідь вище.\\n';\n    out = { id: d.id, close: false, notify,\n      note: `⚠ Автоматичний offboarding завершено частково: AD виконано, Google ні.\\n\\n${body}\\n` +\n            `Що робити далі:\\n${next}` +\n            '2. Нічого не робіть з AD: наступного запуску автоматизація побачить, що акаунт уже заблокований, і повторить лише крок Google.\\n' +\n            '3. Або видаліть гостя вручну і закрийте заявку.\\n\\n' +\n            'Заявку залишено відкритою. ' + tail };\n  }\n}\nreturn [{ json: out, pairedItem: { item: 0 } }];\n"
+      },
+      "id": "9064db1f-1f72-5d39-b92d-30d04dc38577",
+      "name": "Code: Build Report",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1250,
+        230
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "b09cbcea-af17-5ae7-9043-50dc87f8f71a",
+              "leftValue": "={{ $json.close || $json.notify }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "feb87cbd-1c26-524d-90a4-8d22c84607e5",
+      "name": "Update Ticket Needed?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1500,
+        230
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "issueId": "={{ $json.id }}",
+        "notes": "={{ $json.note }}",
+        "additionalFields": {
+          "status_id": "={{ $json.close ? '17' : undefined }}"
+        },
+        "options": {}
+      },
+      "id": "702b954e-4cb2-5c43-bb5e-c55d7218e651",
+      "name": "[Redmine] Update Ticket",
+      "type": "n8n-nodes-redmine.redmine",
+      "typeVersion": 1,
+      "position": [
+        1500,
+        460
+      ],
+      "credentials": {
+        "redmineApi": {
+          "id": "<REDMINE_CRED>",
+          "name": "Redmine bot account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "765378e4-94ee-52b2-af00-73d4d11f9ce0",
+              "leftValue": "={{ $('Update Ticket Needed?').item.json.close }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "a8a6e9fa-c214-5aba-b136-4fc709e9d334",
+      "name": "Add to Archive?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1500,
+        690
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "<ARCHIVE_SHEET_ID>",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Date": "={{ $('Update Ticket Needed?').item.json.leaver_date }}",
+            "Login": "={{ $('Update Ticket Needed?').item.json.login }}",
+            "Ticket ID": "={{ $('Update Ticket Needed?').item.json.id }}",
+            "Google guest account ": "={{ $('Update Ticket Needed?').item.json.guest_email }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Date",
+              "displayName": "Date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Login",
+              "displayName": "Login",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Ticket ID",
+              "displayName": "Ticket ID",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Google guest account ",
+              "displayName": "Google guest account ",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "f79421c4-72c7-5bfa-968b-932b227cf520",
+      "name": "[Sheets] Add to Archive",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [
+        1750,
+        690
+      ],
+      "retryOnFail": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "<SHEETS_CRED>",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Коментар у заявку, коли AD-крок неможливий або впав. Заявка лишається відкритою.\n// Формат: що перевірено, результат, що робити далі. notify = false, якщо про цю саму проблему вже писали.\nconst d = $('Code: Decide AD Action').first().json;\nconst inp = $input.first().json;\nconst state = $getWorkflowStaticData('global');\nstate.notified_run = state.notified_run || {};\n\nconst err = inp.error ? String(inp.error.message || inp.error.description || inp.error) : '';\nconst reason = err ? 'ad_error' : d.ad_status;\nconst guest = d.guest_email || `<логін>_example.com@tenant.example.org.guest.google`;\nconst byLogin = `• Пошук в AD за логіном (sAMAccountName) «${d.login}» по всьому домену, включно з OU «Уволенные».`;\nconst byName = `• AD-логін у заявці не вказано (рядок «AD -» порожній).\\n` +\n  `• ПІБ із заявки: «${d.fio}», латиницею: ${d.gn} ${d.sn}.\\n` +\n  `• Пошук в AD за прізвищем «${d.sn}» і звірка імені «${d.gn}».`;\nconst closeByHand = `якщо акаунт в AD уже видалено вручну, перевірте, чи немає гостьового акаунта Google (${guest}), і закрийте заявку вручну.`;\n\nconst T = {\n  not_found: [byLogin, `акаунт «${d.login}» не знайдено в AD.`, [\n    'перевірте логін у рядку «AD -» (можлива помилка в логіні); після виправлення автоматизація обробить заявку сама;', closeByHand]],\n  multiple: [byLogin, `за логіном «${d.login}» знайдено кілька акаунтів: ${d.candidates}. Потрібна ручна перевірка.`, [\n    'визначте, який акаунт належить працівнику, і заблокуйте його вручну;', 'закрийте заявку вручну.']],\n  outside_scope: [byLogin, `акаунт знайдено поза OU=AllUsers (${d.dn}). Автоматичне блокування для нього вимкнене, потрібна ручна перевірка.`, [\n    'перевірте, чи це той самий працівник (можливо, адмін-персонал або службовий акаунт);',\n    'якщо так, заблокуйте його вручну і закрийте заявку; якщо ні, виправте логін у рядку «AD -».']],\n  fired_but_enabled: [byLogin, `акаунт уже в OU «Уволенные», але не заблокований (${d.dn}).`, [\n    'заблокуйте акаунт вручну (Disable Account);', 'далі автоматизація сама видалить гостьовий акаунт Google і закриє заявку.']],\n  name_not_found: [byName, `акаунт в AD не знайдено.` + (d.candidates ? ` З таким прізвищем є: ${d.candidates}.` : ' Людей із таким прізвищем в AD немає.'), [\n    'якщо знаєте логін, впишіть його в рядок «AD -», і автоматизація обробить заявку сама;', closeByHand]],\n  name_multiple: [byName, `знайдено кілька акаунтів з таким іменем і прізвищем: ${d.candidates}. Автоматично обрати не можна.`, [\n    'визначте, який акаунт належить працівнику, і впишіть його логін у рядок «AD -»;', 'автоматизація обробить заявку під час наступного запуску.']],\n  ad_error: [d.found_by_name ? byName + `\\n• Знайдено акаунт: ${d.login} (${d.dn}).` : byLogin + `\\n• Знайдено акаунт: ${d.dn}.`,\n    `не вдалося заблокувати або перемістити акаунт в AD: ${err}`, [\n    'перевірте права сервісного облікового запису n8n в AD (блокування й переміщення в OU «Уволенные») і доступність контролера домену;',\n    'автоматизація повторить спробу під час наступного запуску; або виконайте блокування вручну.']],\n};\nconst [checked, result, next] = T[reason] || ['', reason, []];\n\nconst key = reason + ':' + (reason === 'ad_error' ? '' : d.dn + '|' + d.candidates);\nconst notify = state.notified_run[d.id] !== key;\nstate.notified_run[d.id] = key;\n\nreturn [{ json: {\n  id: d.id, close: false, reason, notify,\n  note: `⚠ Автоматичний offboarding не виконано.\\n\\nЩо перевірено:\\n${checked}\\n\\nРезультат: ${result}\\n\\n` +\n        `Що робити далі:\\n${next.map((s, i) => `${i + 1}. ${s.charAt(0).toUpperCase()}${s.slice(1)}`).join('\\n')}\\n\\n` +\n        'Заявку залишено відкритою. ' + (reason === 'ad_error' ? 'Google не змінено; стан акаунта в AD перевірте вручну (блокування могло пройти без переміщення). ' : 'Нічого в AD і Google не змінено. ') + 'Автоматизація перевіряє заявку щодня о 18:00; про ту саму проблему повторно не пише.',\n}, pairedItem: { item: 0 } }];\n"
+      },
+      "id": "6aa6ba67-a8fe-5b3b-866b-b62317d1ab01",
+      "name": "Code: Build Problem Note",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        500,
+        460
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## 🛡️ [PROD] Offboarding лінійного персоналу (GA | Leaver)\nБлокування в AD, видалення гостя з Google Workspace, архів у Google Sheets, звіт у Redmine.\n\n**Розклад:** щодня о 18:00 (Europe/Kyiv).\n\n**Логіка**\n1. Redmine: відкриті заявки трекера 41, усі сторінки.\n2. Розбір: AD-логін (рядок `AD -` в описі або поле «AD login»; якщо порожньо, пошук в AD за ПІБ з рядка `ГА -` або теми, латиницею за КМУ-2010, лише при єдиному збігу імені та прізвища), дата звільнення (Termination date → Due date → тема). Дата в майбутньому: чекаємо. Немає логіна чи дати: один коментар у заявку, заявка відкрита.\n3. По кожній заявці: пошук у всьому AD за sAMAccountName.\n   * в `OU=AllUsers`: блокування (прапорець ACCOUNTDISABLE, інші не чіпаємо) і перенос в `OU=Уволенные` (LDAP-ноди, креди в n8n);\n   * вже заблокований в «Уволенные»: AD пропускаємо;\n   * логін є, а в AD немає: перевірка (читання) гостя Google; гостя теж немає = імовірно видалено автоматично за неактивність, закриваємо з поясненням; гість є = коментар;\n   * кілька, поза AllUsers, не знайдено за ПІБ, помилка: коментар, заявка відкрита.\n4. Google: на початку запуску перевірка доступу до API (читання одного користувача домену). Для цього сервісного акаунта неіснуючий гість дає 403, а не 404 (перевірено 14.10.2026), тому 403 = «гостя немає» лише якщо перевірка доступу пройшла.\n   DELETE гостя. 2xx або «гостя немає»: закриваємо заявку (статус 17) зі звітом і пишемо в архів. Інша відповідь: коментар, повтор наступного дня.\n\n**Без спаму:** коментар про ту саму проблему пишеться один раз (static data флоу).\n**Помилки:** Error Workflow.",
+        "height": 640,
+        "width": 640,
+        "color": 6
+      },
+      "id": "c463564e-d7fa-5a0f-b3f5-df21a930f8f2",
+      "name": "Sticky Note: Overview",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        0,
+        -780
+      ]
+    }
+  ],
+  "connections": {
+    "Every Day 18:00": {
+      "main": [
+        [
+          {
+            "node": "[Google] Check API Access",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "[Google] Check API Access": {
+      "main": [
+        [
+          {
+            "node": "[Redmine] Get Open Leaver Tickets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "[Redmine] Get Open Leaver Tickets": {
+      "main": [
+        [
+          {
+            "node": "Code: Parse Tickets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code: Parse Tickets": {
+      "main": [
+        [
+          {
+            "node": "Ticket Ready?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ticket Ready?": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Tickets",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "[Redmine] Comment Missing Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Tickets": {
+      "main": [
+        [],
+        [
+          {
+            "node": "[AD] Search User",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "[AD] Search User": {
+      "main": [
+        [
+          {
+            "node": "Code: Decide AD Action",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code: Decide AD Action": {
+      "main": [
+        [
+          {
+            "node": "Route by AD Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route by AD Status": {
+      "main": [
+        [
+          {
+            "node": "[AD] Disable Account",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "[Google] Delete Guest",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "[Google] Check Guest Exists",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Code: Build Problem Note",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "[AD] Disable Account": {
+      "main": [
+        [
+          {
+            "node": "[AD] Move to Fired OU",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Code: Build Problem Note",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "[AD] Move to Fired OU": {
+      "main": [
+        [
+          {
+            "node": "[Google] Delete Guest",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Code: Build Problem Note",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "[Google] Delete Guest": {
+      "main": [
+        [
+          {
+            "node": "Code: Build Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "[Google] Check Guest Exists": {
+      "main": [
+        [
+          {
+            "node": "Code: Build Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code: Build Report": {
+      "main": [
+        [
+          {
+            "node": "Update Ticket Needed?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code: Build Problem Note": {
+      "main": [
+        [
+          {
+            "node": "Update Ticket Needed?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Ticket Needed?": {
+      "main": [
+        [
+          {
+            "node": "[Redmine] Update Ticket",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Loop Over Tickets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "[Redmine] Update Ticket": {
+      "main": [
+        [
+          {
+            "node": "Add to Archive?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Add to Archive?": {
+      "main": [
+        [
+          {
+            "node": "[Sheets] Add to Archive",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Loop Over Tickets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "[Sheets] Add to Archive": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Tickets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Europe/Kyiv",
+    "errorWorkflow": "<ERROR_WORKFLOW_ID>",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": true
+  }
+}

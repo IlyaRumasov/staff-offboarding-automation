@@ -1,0 +1,7 @@
+context/
+.raw/
+.env
+*.key
+*key*.txt
+__pycache__/
+*.pyc

@@ -1,0 +1,1382 @@
+{
+  "name": "[PROD] Redmine & AD Offboarding Automation (Admin Staff) / [PROD] Автоматизація звільнення (Адмін персонал)",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 18 * * *"
+            }
+          ]
+        }
+      },
+      "id": "407a55aa-c849-566d-abfb-7893bd93e7d8",
+      "name": "Every Day 18:00",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "returnAll": true,
+        "filters": {
+          "project_id": "staff-leavers",
+          "tracker_id": "25",
+          "status_id": "open"
+        },
+        "options": {}
+      },
+      "id": "1c372abd-1a27-52df-81b5-77d959b7604a",
+      "name": "[Redmine] Get Open Leaver Tickets",
+      "type": "n8n-nodes-redmine.redmine",
+      "typeVersion": 1,
+      "position": [
+        250,
+        0
+      ],
+      "credentials": {
+        "redmineApi": {
+          "id": "<REDMINE_CRED>",
+          "name": "Redmine bot account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Розбір заявок «Admin | Leaver» (трекер 25): дата звільнення, ім'я (обидва порядки), кому передати диск.\n// Вихід: action = 'process' або 'notify' (бракує даних; коментар пишеться один раз, пам'ять у static data).\nconst TERM_DATE_CF_ID = 30;   // «Termination date» (на тесті інший номер, тому шукаємо й за назвою)\nconst ENG_CF_ID = 11, UKR_CF_ID = 103, MANAGER_CF_ID = 25;\n\nconst state = $getWorkflowStaticData('global');\nstate.notified = state.notified || {};\nconst today = DateTime.now().setZone('Europe/Kyiv').toISODate();\n\nlet issues = [];\nfor (const it of $input.all()) {\n  if (Array.isArray(it.json.issues)) issues.push(...it.json.issues);\n  else if (it.json && it.json.id) issues.push(it.json);\n}\nconst cf = (issue, id, name) => (issue.custom_fields || []).find(f => f.id === id || f.name === name);\nconst cfv = (issue, id, name) => { const f = cf(issue, id, name); return f && f.value ? String(f.value).trim() : ''; };\n\n// Транслітерація КМУ-2010 (як імена записані в AD/Google).\nconst TR = { а:'a', б:'b', в:'v', г:'h', ґ:'g', д:'d', е:'e', є:'ie', ж:'zh', з:'z', и:'y', і:'i', ї:'i', й:'i', к:'k', л:'l',\n  м:'m', н:'n', о:'o', п:'p', р:'r', с:'s', т:'t', у:'u', ф:'f', х:'kh', ц:'ts', ч:'ch', ш:'sh', щ:'shch', ь:'', ю:'iu', я:'ia',\n  ы:'y', э:'e', ё:'io', ъ:'' };\nconst TR_START = { є:'ye', ї:'yi', й:'y', ю:'yu', я:'ya', ё:'yo' };\nfunction translit(word) {\n  const w = word.toLowerCase().replace(/[’'ʼ`]/g, '').replace(/зг/g, 'zgh');\n  let out = '';\n  for (let i = 0; i < w.length; i++) out += (i === 0 && TR_START[w[i]]) || (TR[w[i]] !== undefined ? TR[w[i]] : w[i]);\n  return out.charAt(0).toUpperCase() + out.slice(1);\n}\nconst isCyr = s => /[А-Яа-яЁёЄєІіЇїҐґ]/.test(s);\nconst isLat = s => /^[A-Za-z][A-Za-z'’ʼ-]*$/.test(s);\n\n// Пари [ім'я, прізвище] в обох порядках: «Ivan Testovenko» і «Probenko Olha» пишуть по-різному.\nfunction namePairs(raw) {\n  const parts = String(raw || '').replace(/^(ФОП|ФЛП)\\s+/i, '').split(/[\\s/,]+/).filter(Boolean);\n  if (parts.length < 2) return [];\n  let a = parts[0], b = parts[1];\n  if (isCyr(a) || isCyr(b)) { if (!isCyr(a) || !isCyr(b)) return []; a = translit(a); b = translit(b); }\n  else if (!isLat(a) || !isLat(b)) return [];\n  const pairs = [[a, b], [b, a]];\n  return pairs.filter((p, i) => i === 0 || p[0] !== pairs[0][0]);\n}\n\nfunction parseDate(issue) {\n  let d = cfv(issue, TERM_DATE_CF_ID, 'Termination date') || issue.due_date || '';\n  d = String(d).trim();\n  if (!d) return { reason: 'no_date' };\n  if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(d) || !DateTime.fromISO(d).isValid) return { reason: 'bad_date', value: d };\n  return { date: d };\n}\n\n// Кому передати диск. mode: email | name | manager | none\nconst NO_TRANSFER = /(не\\s*(потрібно|треба|переадресов\\p{L}*|передава\\p{L}*)|видалити|немає|^ні$|^-$)/iu;\nfunction parseDrive(description, manager) {\n  const d = description || '';\n  if (/(дані|диск)[^\\r\\n]{0,40}передавати\\s+не\\s+потрібно/i.test(d)) return { mode: 'none', text: 'передавати не потрібно' };\n  const m = d.match(/Переадресація\\s+диску\\s*[:\\-–—]\\s*([^\\r\\n]*)/i)\n         || d.match(/Дані\\s+(?:пошти\\s+(?:та|і|й)\\s+)?диску\\s+передати\\s*[:\\-–—]?\\s*([^\\r\\n]*)/i);\n  if (m) {\n    const v = m[1].trim();\n    const email = (v.match(/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}/) || [])[0];\n    if (email) return { mode: 'email', email: email.toLowerCase(), text: v };\n    if (!v || NO_TRANSFER.test(v)) return { mode: 'none', text: v || 'не вказано' };\n    const pairs = namePairs(v.replace(/[-–—].*$/, '').trim());\n    return pairs.length ? { mode: 'name', name: v, pairs, text: v } : { mode: 'unknown', text: v };\n  }\n  const mp = namePairs(manager);\n  return mp.length ? { mode: 'manager', name: manager, pairs: mp, text: `не вказано, менеджер: ${manager}` }\n                   : { mode: 'unknown', text: 'не вказано, менеджера в заявці немає' };\n}\n\nconst NOTES = {\n  no_date: () => ['• Поле «Termination date»: порожнє.\\n• Due date: порожня.',\n    'не вказано дату звільнення, тому невідомо, коли закривати доступи.',\n    ['заповніть «Termination date» (РРРР-ММ-ДД); у день звільнення або пізніше автоматизація обробить заявку сама.']],\n  bad_date: v => [`• Дата звільнення в заявці: «${v}».`, `дату «${v}» не вдалося розпізнати (очікується РРРР-ММ-ДД).`,\n    ['виправте дату в полі «Termination date», і автоматизація обробить заявку сама.']],\n  no_name: v => [`• «Contractor (ENG)»: «${v.eng || ''}».\\n• «Contractor (UKR)»: «${v.ukr || ''}».`,\n    'не вдалося визначити ім\\'я та прізвище працівника, тому шукати його в AD, Google і M365 немає за чим.',\n    ['заповніть «Contractor (ENG)» у форматі «Ім\\'я Прізвище» латиницею.']],\n};\nconst fmt = ([checked, result, next]) =>\n  `⚠ Автоматичний offboarding не виконано.\\n\\nЩо перевірено:\\n${checked}\\n\\nРезультат: ${result}\\n\\n` +\n  `Що робити далі:\\n${next.map((s, i) => `${i + 1}. ${s.charAt(0).toUpperCase()}${s.slice(1)}`).join('\\n')}\\n\\n` +\n  'Заявку залишено відкритою. Нічого в AD, Google і M365 не змінено. Автоматизація перевіряє заявку щодня о 18:00; про ту саму проблему повторно не пише.';\n\nconst results = [];\nconst openIds = new Set();\nfor (const issue of issues) {\n  if (!issue || !issue.tracker || issue.tracker.id !== 25) continue;\n  const id = issue.id;\n  openIds.add(String(id));\n  const D = parseDate(issue);\n  if (D.date && D.date > today) continue;  // ще не звільнився\n\n  const eng = cfv(issue, ENG_CF_ID, 'Contractor (ENG)');\n  const ukr = cfv(issue, UKR_CF_ID, 'Contractor (UKR)');\n  const pairs = namePairs(eng).length ? namePairs(eng) : namePairs(ukr);\n  const problem = D.reason ? D : (!pairs.length ? { reason: 'no_name', value: { eng, ukr } } : null);\n  if (problem) {\n    const key = 'input:' + problem.reason + ':' + JSON.stringify(problem.value || '');\n    if (state.notified[id] === key) continue;\n    state.notified[id] = key;\n    results.push({ json: { action: 'notify', id, reason: problem.reason, note: fmt(NOTES[problem.reason](problem.value)) } });\n    continue;\n  }\n  if (String(state.notified[id] || '').startsWith('input:')) delete state.notified[id];\n  const manager = cfv(issue, MANAGER_CF_ID, 'Manager');\n  // Шаблони логінів в AD (запасний пошук, якщо в акаунта не заповнені ім'я/прізвище):\n// ім'я.прізвище, і.прізвище, ms.і.прізвище, ms.ім'я.прізвище (ms. у старих акаунтів).\nconst loginVariants = (g, s) => {\n  const G = g.toLowerCase().replace(/[^a-z-]/g, ''), S = s.toLowerCase().replace(/[^a-z-]/g, '');\n  if (!G || !S) return [];\n  return [`${G}.${S}`, `${G[0]}.${S}`, `ms.${G[0]}.${S}`, `ms.${G}.${S}`];\n};\n  const ldapEsc = s => s.replace(/[\\\\*()\\0]/g, c => '\\\\' + c.charCodeAt(0).toString(16).padStart(2, '0'));\n  results.push({ json: {\n    action: 'process', id, subject: issue.subject || '', leaver_date: D.date,\n    person: eng || ukr, pairs, drive: parseDrive(issue.description, manager === '-' ? '' : manager),\n    login_variants: [...new Set(pairs.flatMap(([g, s]) => loginVariants(g, s)))],\n    ldap_filter: '(&(objectClass=user)(|' + pairs.map(([g, s]) => `(&(givenName=${ldapEsc(g)})(sn=${ldapEsc(s)}))`).join('') +\n      [...new Set(pairs.flatMap(([g, s]) => loginVariants(g, s)))].map(v => `(sAMAccountName=${ldapEsc(v)})`).join('') + '))',\n  } });\n}\nfor (const k of Object.keys(state.notified)) if (!openIds.has(k)) delete state.notified[k];\nreturn results;\n"
+      },
+      "id": "f5d53220-5131-57fb-b1f8-f9c2d1b4fc3f",
+      "name": "Code: Parse Tickets",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        500,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "a2523691-41f6-5ec2-8eb6-b9948c406650",
+              "leftValue": "={{ $json.action === 'process' }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "a1ab21e0-f303-5492-87f7-2c216aa4053e",
+      "name": "Ticket Ready?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        750,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "issueId": "={{ $json.id }}",
+        "notes": "={{ $json.note }}",
+        "additionalFields": {},
+        "options": {}
+      },
+      "id": "bbd0bf78-143b-50f5-8638-8196e28f30ba",
+      "name": "[Redmine] Comment Missing Data",
+      "type": "n8n-nodes-redmine.redmine",
+      "typeVersion": 1,
+      "position": [
+        750,
+        172
+      ],
+      "credentials": {
+        "redmineApi": {
+          "id": "<REDMINE_CRED>",
+          "name": "Redmine bot account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "308b10a0-513a-5058-8032-e68f57aa8865",
+      "name": "Loop Over Tickets",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        1000,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "issueId": "={{ $json.id }}",
+        "include": [
+          "journals"
+        ],
+        "options": {}
+      },
+      "id": "cf5f7c13-6316-5e77-a4f0-4ffc1f68880e",
+      "name": "[Redmine] Get Ticket History",
+      "type": "n8n-nodes-redmine.redmine",
+      "typeVersion": 1,
+      "position": [
+        1250,
+        0
+      ],
+      "credentials": {
+        "redmineApi": {
+          "id": "<REDMINE_CRED>",
+          "name": "Redmine bot account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "baseDN": "DC=example,DC=com",
+        "searchFor": "custom",
+        "customFilter": "={{ $('Loop Over Tickets').first().json.ldap_filter }}",
+        "returnAll": true,
+        "options": {
+          "scope": "sub",
+          "attributes": [
+            "userAccountControl",
+            "sAMAccountName",
+            "givenName",
+            "sn",
+            "displayName",
+            "mail",
+            "userPrincipalName"
+          ]
+        }
+      },
+      "id": "1d8ecba4-d8b0-5722-88a2-0c1554c9c370",
+      "name": "[AD] Search User",
+      "type": "n8n-nodes-base.ldap",
+      "typeVersion": 1,
+      "position": [
+        1500,
+        0
+      ],
+      "alwaysOutputData": true,
+      "credentials": {
+        "ldap": {
+          "id": "<LDAP_CRED>",
+          "name": "LDAP service account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Пошук в AD за ім'ям і прізвищем (обидва порядки) по всьому домену. Блокуємо лише при єдиному збігу в OU=AllUsers.\n// ad.status: disable | already_done | not_found | multiple | outside_scope | fired_but_enabled\nconst SCOPE = ',OU=AllUsers,OU=COMPANY,DC=example,DC=com';\nconst FIRED_OU = 'OU=Уволенные,DC=example,DC=com';\nconst ctx = $('Loop Over Tickets').first().json;\nconst one = v => Array.isArray(v) ? v[0] : v;\nconst endsCI = (s, t) => s.toLowerCase().endsWith(t.toLowerCase());\nconst low = v => String(one(v) || '').toLowerCase();\nconst all = $input.all().map(i => i.json).filter(j => j && j.dn);\n// Спершу збіг імені й прізвища; якщо нема, запасний шлях: логін за шаблоном, ім'я/прізвище порожні або збігаються.\nconst byName = all.filter(j => ctx.pairs.some(([g, s]) => low(j.givenName) === g.toLowerCase() && low(j.sn) === s.toLowerCase()));\nconst byLogin = all.filter(j => (ctx.login_variants || []).includes(low(j.sAMAccountName)) &&\n  ctx.pairs.some(([g, s]) => (!low(j.givenName) || low(j.givenName) === g.toLowerCase()) && (!low(j.sn) || low(j.sn) === s.toLowerCase())));\nconst found = byName.length ? byName : byLogin;\nconst where = j => {\n  const dn = String(j.dn), uac = parseInt(one(j.userAccountControl), 10) || 0;\n  const ou = endsCI(dn, ',' + FIRED_OU) ? 'Уволенные' : (dn.match(/,OU=([^,]+)/) || [])[1] || '?';\n  return `${one(j.sAMAccountName)} (${ou}, ${(uac & 2) ? 'заблокований' : 'активний'})`;\n};\nconst ad = { status: '', dn: '', target_dn: '', new_uac: '', login: '', candidates: found.map(where).join('; '),\n  by_login_pattern: !byName.length && byLogin.length === 1 };\nif (found.length === 0) ad.status = 'not_found';\nelse if (found.length > 1) ad.status = 'multiple';\nelse {\n  const j = found[0], dn = String(j.dn), uac = parseInt(one(j.userAccountControl), 10) || 0;\n  ad.dn = dn; ad.login = String(one(j.sAMAccountName) || '');\n  if (endsCI(dn, ',' + FIRED_OU)) ad.status = (uac & 2) ? 'already_done' : 'fired_but_enabled';\n  else if (endsCI(dn, SCOPE)) {\n    ad.status = 'disable';\n    ad.new_uac = String(uac | 2);  // лише ACCOUNTDISABLE, інші прапорці не чіпаємо\n    ad.target_dn = `${dn.match(/^((?:\\\\.|[^,\\\\])+),/)[1]},${FIRED_OU}`;\n  } else ad.status = 'outside_scope';\n}\nreturn [{ json: { ...ctx, ad }, pairedItem: { item: 0 } }];\n"
+      },
+      "id": "2f54a248-0481-579f-a13c-37945cce5cf3",
+      "name": "Code: Decide AD Action",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1750,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "8e5a855e-9b86-5770-b85e-0f8cb08ed36f",
+              "leftValue": "={{ $json.ad.status === 'disable' }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "f0df9ebf-9c76-5051-b553-75bb3571922e",
+      "name": "Disable in AD?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        0,
+        230
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "dn": "={{ $json.ad.dn }}",
+        "attributes": {
+          "replace": [
+            {
+              "id": "userAccountControl",
+              "value": "={{ $json.ad.new_uac }}"
+            }
+          ]
+        }
+      },
+      "id": "7d7350eb-a2e0-5f7d-a8fb-1c7a6fed765b",
+      "name": "[AD] Disable Account",
+      "type": "n8n-nodes-base.ldap",
+      "typeVersion": 1,
+      "position": [
+        250,
+        230
+      ],
+      "onError": "continueRegularOutput",
+      "credentials": {
+        "ldap": {
+          "id": "<LDAP_CRED>",
+          "name": "LDAP service account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "abc5b9cc-8676-59a4-a458-3f63b665cbfb",
+              "leftValue": "={{ !$json.error }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "b63cbd13-6e81-56e5-9af4-3331cc1604da",
+      "name": "Disabled OK?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        500,
+        230
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "rename",
+        "dn": "={{ $('Code: Decide AD Action').first().json.ad.dn }}",
+        "targetDn": "={{ $('Code: Decide AD Action').first().json.ad.target_dn }}"
+      },
+      "id": "602cf099-c0c1-5051-9f86-f8fb79cbebf1",
+      "name": "[AD] Move to Fired OU",
+      "type": "n8n-nodes-base.ldap",
+      "typeVersion": 1,
+      "position": [
+        750,
+        230
+      ],
+      "onError": "continueRegularOutput",
+      "credentials": {
+        "ldap": {
+          "id": "<LDAP_CRED>",
+          "name": "LDAP service account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Результат кроку AD (блокування і перенесення, або пропуск) + запити пошуку людини в Google.\n// По одному запиту на кожен порядок імені: Google не вміє OR у query.\nconst ctx = $('Code: Decide AD Action').first().json;\nconst r = $input.first().json;\nconst text = e => String((e && (e.message || e.description)) || e || 'невідома помилка');\nconst ad = { ...ctx.ad };\nif (ad.status === 'disable') {\n  const disableErr = $('[AD] Disable Account').first().json.error;   // блокування не вдалося: перенесення не запускалось\n  const err = disableErr || r.error;                                  // інакше помилка могла бути лише в перенесенні\n  if (err) { ad.result = 'error'; ad.error = `${disableErr ? 'блокування' : 'перенесення в «Уволенные»'}: ${text(err)}`; }\n  else ad.result = 'disabled';\n} else ad.result = ad.status;\nconst merged = { ...ctx, ad };\nconst q = s => `'${String(s).replace(/'/g, \"\\\\'\")}'`;\nreturn ctx.pairs.map(([g, s]) => ({ json: { ...merged,\n  url: 'https://admin.googleapis.com/admin/directory/v1/users?customer=my_customer&maxResults=10&query=' +\n       encodeURIComponent(`givenName:${q(g)} familyName:${q(s)}`) }, pairedItem: { item: 0 } }));\n"
+      },
+      "id": "21ea6c3e-a00c-5242-9d4a-150eac32b6d3",
+      "name": "Code: Prepare Google Search",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1000,
+        230
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $json.url }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "gSuiteAdminOAuth2Api",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          }
+        }
+      },
+      "id": "37601833-f19e-5c70-b7bf-4a21177dbd26",
+      "name": "[Google] Find User",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1250,
+        230
+      ],
+      "onError": "continueRegularOutput",
+      "credentials": {
+        "gSuiteAdminOAuth2Api": {
+          "id": "<GADMIN_CRED>",
+          "name": "Google Workspace Admin account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Що робити з акаунтом Google: google.status = suspend | already_suspended | not_found | multiple | error\nconst ctx = $('Code: Prepare Google Search').first().json;\nconst res = $input.all().map(i => i.json);\nconst err = res.find(r => Number(r.statusCode) !== 200);\nconst users = {};\nfor (const r of res) for (const u of ((r.body && r.body.users) || [])) users[u.id] = u;\nconst list = Object.values(users);\nconst google = { status: '', id: '', email: '', candidates: list.map(u => `${u.primaryEmail}${u.suspended ? ' (призупинений)' : ''}`).join('; ') };\nif (err && !list.length) { google.status = 'error'; google.error = `${err.statusCode}: ${(err.body && err.body.error && err.body.error.message) || err.statusMessage || 'немає відповіді'}`; }\nelse if (list.length === 0) google.status = 'not_found';\nelse if (list.length > 1) google.status = 'multiple';\nelse {\n  const u = list[0];\n  google.id = u.id; google.email = u.primaryEmail;\n  google.status = u.suspended ? 'already_suspended' : 'suspend';\n}\nreturn [{ json: { ...ctx, google }, pairedItem: { item: 0 } }];\n"
+      },
+      "id": "bc5528bf-15cc-5c69-90d0-84561381f5e7",
+      "name": "Code: Decide Google Action",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1500,
+        230
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "f985d0d1-03a4-5eb2-86ca-cea053a1dda4",
+              "leftValue": "={{ $json.google.status === 'suspend' }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "c3ed14b8-84db-5230-95f6-3987cc53325a",
+      "name": "Suspend in Google?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1750,
+        230
+      ]
+    },
+    {
+      "parameters": {
+        "method": "PUT",
+        "url": "=https://admin.googleapis.com/admin/directory/v1/users/{{ $json.google.id }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "gSuiteAdminOAuth2Api",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          }
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"suspended\": true}"
+      },
+      "id": "dc67845b-be79-5610-8d7c-ba3152087632",
+      "name": "[Google] Suspend User",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        0,
+        460
+      ],
+      "onError": "continueRegularOutput",
+      "credentials": {
+        "gSuiteAdminOAuth2Api": {
+          "id": "<GADMIN_CRED>",
+          "name": "Google Workspace Admin account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Результат кроку Google (призупинення або пропуск), стан заявки з історії коментарів і запит пошуку отримувача диска.\n// Стан: техніка, підтвердження передачі диска («так» після питання бота), попередні звіти бота.\n// Нотатки бота впізнаємо за «Автоматичний offboarding» (старий флоу писав «Автоматичний Offboarding»).\nconst ctx = $('Code: Decide Google Action').first().json;\nconst r = $input.first().json;\nconst google = { ...ctx.google };\nif (google.status === 'suspend') {\n  const code = Number(r.statusCode);\n  if (code >= 200 && code < 300 && r.body && r.body.suspended === true) google.result = 'suspended';\n  else { google.result = 'error'; google.error = `${code || 'немає відповіді'}: ${(r.body && r.body.error && r.body.error.message) || (r.error && r.error.message) || 'акаунт не призупинено'}`; }\n} else google.result = google.status;\n\nconst t = $('[Redmine] Get Ticket History').first().json;\nconst issue = t.issue || t;\nconst journals = (issue.journals || []).filter(j => j && j.notes);\nconst isBot = n => /Автоматичний\\s+offboarding/i.test(n);\n\n// Техніка: вирішує останній людський коментар про техніку (старий бот брехав «Заборгованості немає», його не рахуємо).\n// \\p{L} з прапорцем u: без нього \\w і \\b у JS не бачать кирилицю.\nconst EQ_OK = /забор\\p{L}*\\s+по\\s+техн\\p{L}*\\s+нема|техн\\p{L}*\\s+(повернуто|повернув|повернула|здано|здав|здала)|нічого\\s+не\\s+числиться/iu;\nconst EQ_DEBT = /(закріплен\\p{L}*|числиться|не\\s+поверну\\p{L}*|не\\s+здан\\p{L}*)[^\\r\\n]{0,40}(ноут|техн|монітор|комп|пк|телефон|гарнітур|інв)/iu;\nlet equipment = 'unknown', equipment_note = '';\nfor (const j of journals) {\n  if (isBot(j.notes)) continue;\n  if (EQ_DEBT.test(j.notes)) { equipment = 'debt'; equipment_note = j.notes.trim(); }\n  else if (EQ_OK.test(j.notes)) { equipment = 'ok'; equipment_note = j.notes.trim(); }\n}\n\n// Передача диска: питання бота «Передати диск ... (email)?» і пізніша людська відповідь «так».\nlet asked_email = '', confirmed_email = '', drive_done_before = false;\nfor (const j of journals) {\n  if (isBot(j.notes)) {\n    const q = j.notes.match(/Передати\\s+диск[^\\r\\n]*?\\(([^)\\s]+@[^)\\s]+)\\)\\?/i);\n    if (q) { asked_email = q[1].toLowerCase(); confirmed_email = ''; }\n    if (/•\\s*Диск:\\s*перенесення\\s+запущено/i.test(j.notes)) drive_done_before = true;  // рядок зі звіту final_report.js\n    if (/Google\\s+Диск[\\s\\S]{0,400}?Успішно\\s+ініційовано/i.test(j.notes)) drive_done_before = true;  // звіт старого флоу\n  } else if (asked_email && /^\\s*(так|да|yes|ок|ok|\\+|підтверджую)(?=$|[\\s.,!)])/iu.test(j.notes)) {\n    confirmed_email = asked_email;\n  }\n}\n\nconst prior_report = journals.some(j => isBot(j.notes) && /(успішно\\s+завершено|Звіт\\s+про\\s+закриття\\s+доступів)/i.test(j.notes));\n\n\nconst merged = { ...ctx, google, equipment, equipment_note, asked_email, confirmed_email, drive_done_before, prior_report };\n\n// Кого шукати в Google як отримувача диска. Без запиту, якщо передавати не треба або акаунта працівника немає.\nconst d = ctx.drive || {};\nconst base = 'https://admin.googleapis.com/admin/directory/v1/users';\nconst q = s => `'${String(s).replace(/'/g, \"\\\\'\")}'`;\nconst leaverOk = ['suspended', 'already_suspended'].includes(google.result);\nlet urls = [];\nif (leaverOk && !drive_done_before) {\n  if (d.mode === 'email') urls = [`${base}/${encodeURIComponent(d.email)}`];\n  else if (['name', 'manager'].includes(d.mode)) {\n    urls = confirmed_email ? [`${base}/${encodeURIComponent(confirmed_email)}`]\n      : d.pairs.map(([g, s]) => `${base}?customer=my_customer&maxResults=10&query=` + encodeURIComponent(`givenName:${q(g)} familyName:${q(s)}`));\n  }\n}\nreturn (urls.length ? urls : ['']).map(url => ({ json: { ...merged, url }, pairedItem: { item: 0 } }));\n"
+      },
+      "id": "b7e117b4-058e-5004-b6de-b735220a37eb",
+      "name": "Code: Prepare Drive Transfer",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        250,
+        460
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "828349c7-e6df-5f9c-bea8-4ef222c37f04",
+              "leftValue": "={{ $json.url !== '' }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "b92f243d-f195-5563-b2c8-64a75d788431",
+      "name": "Recipient Lookup Needed?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        500,
+        460
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $json.url }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "gSuiteAdminOAuth2Api",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          }
+        }
+      },
+      "id": "5031555f-5e9a-5302-abf6-1fa60c006592",
+      "name": "[Google] Find Drive Recipient",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        750,
+        460
+      ],
+      "onError": "continueRegularOutput",
+      "credentials": {
+        "gSuiteAdminOAuth2Api": {
+          "id": "<GADMIN_CRED>",
+          "name": "Google Workspace Admin account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Що робити з диском: drive.action = transfer | ask | none | skip\nconst ctx = $('Code: Prepare Drive Transfer').first().json;\nconst d = { ...(ctx.drive || {}) };\nconst res = $input.all().map(i => i.json).filter(r => r.statusCode !== undefined);\nconst users = {};\nfor (const r of res) {\n  if (Number(r.statusCode) !== 200 || !r.body) continue;\n  for (const u of (r.body.users || (r.body.primaryEmail ? [r.body] : []))) if (!u.suspended) users[u.id] = u;\n}\nconst list = Object.values(users);\nconst leaverOk = ['suspended', 'already_suspended'].includes(ctx.google.result);\nd.candidates = list.map(u => `${(u.name && u.name.fullName) || ''} (${u.primaryEmail})`).join('; ');\n\nif (ctx.drive_done_before) { d.action = 'skip'; d.status = 'done_before'; }\nelse if (d.mode === 'none') { d.action = 'none'; d.status = 'not_needed'; }\nelse if (d.mode === 'unknown') { d.action = 'none'; d.status = 'unknown_target'; }\nelse if (!leaverOk) { d.action = 'none'; d.status = 'no_leaver_account'; }\nelse if (list.length === 0) { d.action = 'none'; d.status = d.mode === 'email' ? 'recipient_not_found' : 'recipient_name_not_found'; }\nelse if (list.length > 1) { d.action = 'none'; d.status = 'recipient_multiple'; }\nelse {\n  const u = list[0];\n  d.recipient_id = u.id; d.recipient_email = u.primaryEmail.toLowerCase();\n  d.recipient_name = (u.name && u.name.fullName) || u.primaryEmail;\n  const confirmed = d.mode === 'email' || (ctx.confirmed_email && ctx.confirmed_email === d.recipient_email);\n  if (confirmed) { d.action = 'transfer'; d.status = 'transfer'; }\n  else { d.action = 'ask'; d.status = 'ask'; }\n}\nreturn [{ json: { ...ctx, drive: d }, pairedItem: { item: 0 } }];\n"
+      },
+      "id": "09822f69-be3e-54bb-8a09-07ae39e077a4",
+      "name": "Code: Decide Drive Action",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1000,
+        460
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "feab1c82-bb20-5763-b83b-c7611192c3ec",
+              "leftValue": "={{ $json.drive.action === 'transfer' }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "3f1af5df-6bd8-5e44-9f89-5f01e03a4286",
+      "name": "Transfer Drive?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1250,
+        460
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://admin.googleapis.com/admin/datatransfer/v1/transfers",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleOAuth2Api",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          }
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"oldOwnerUserId\": \"{{ $json.google.id }}\",\n  \"newOwnerUserId\": \"{{ $json.drive.recipient_id }}\",\n  \"applicationDataTransfers\": [{\"applicationId\": \"55656082996\",\n    \"applicationTransferParams\": [{\"key\": \"PRIVACY_LEVEL\", \"value\": [\"SHARED\", \"PRIVATE\"]}]}]\n}"
+      },
+      "id": "9520a60e-b71a-5d15-9388-cda5e2819487",
+      "name": "[Google] Transfer Drive",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1500,
+        460
+      ],
+      "onError": "continueRegularOutput",
+      "credentials": {
+        "googleOAuth2Api": {
+          "id": "<GOAUTH_CRED>",
+          "name": "Google account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Результат передачі диска (запуск або пропуск) + запит пошуку в Microsoft Graph:\n// члени тенанта (не гості #EXT#) з таким ім'ям і прізвищем, обидва порядки.\nconst ctx = $('Code: Decide Drive Action').first().json;\nconst r = $input.first().json;\nconst drive = { ...ctx.drive };\nif (drive.action === 'transfer') {\n  const code = Number(r.statusCode);\n  if (code >= 200 && code < 300) { drive.result = 'transferred'; drive.transfer_status = (r.body && r.body.overallTransferStatusCode) || ''; }\n  else { drive.result = 'error'; drive.error = `${code || 'немає відповіді'}: ${(r.body && r.body.error && r.body.error.message) || (r.error && r.error.message) || 'перенесення не запущено'}`; }\n} else drive.result = drive.status;\nconst e = s => String(s).replace(/'/g, \"''\");\nconst filter = ctx.pairs.map(([g, s]) => `(givenName eq '${e(g)}' and surname eq '${e(s)}')`).join(' or ');\nreturn [{ json: { ...ctx, drive,\n  url: 'https://graph.microsoft.com/v1.0/users?$select=id,userPrincipalName,mail,givenName,surname,accountEnabled,userType&$top=10&$filter=' + encodeURIComponent(filter) },\n  pairedItem: { item: 0 } }];\n"
+      },
+      "id": "d82614f7-2b44-54a1-ae97-bd45eeb88ff4",
+      "name": "Code: Prepare M365 Search",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1750,
+        460
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $json.url }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "microsoftEntraOAuth2Api",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          }
+        }
+      },
+      "id": "fabdd1f0-1f3c-578d-b9cd-8d50d8b3aed0",
+      "name": "[M365] Search User",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        0,
+        690
+      ],
+      "onError": "continueRegularOutput",
+      "credentials": {
+        "microsoftEntraOAuth2Api": {
+          "id": "<ENTRA_CRED>",
+          "name": "Microsoft Entra ID (Azure Active Directory) account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Що робити з акаунтом M365: m365.status = delete | not_found | multiple | error\nconst ctx = $('Code: Prepare M365 Search').first().json;\nconst r = $input.first().json;\nconst m365 = { status: '', id: '', upn: '' };\nif (Number(r.statusCode) !== 200) {\n  m365.status = 'error';\n  m365.error = `${r.statusCode || 'немає відповіді'}: ${(r.body && r.body.error && r.body.error.message) || 'пошук не вдався'}`;\n} else {\n  const list = ((r.body && r.body.value) || []).filter(u => u.userType !== 'Guest' && !String(u.userPrincipalName).includes('#EXT#'));\n  m365.candidates = list.map(u => u.userPrincipalName).join('; ');\n  if (list.length === 0) m365.status = 'not_found';\n  else if (list.length > 1) m365.status = 'multiple';\n  else { m365.status = 'delete'; m365.id = list[0].id; m365.upn = list[0].userPrincipalName; }\n}\nreturn [{ json: { ...ctx, m365 }, pairedItem: { item: 0 } }];\n"
+      },
+      "id": "b7ccc51c-3e82-57da-8507-94c968a1afff",
+      "name": "Code: Decide M365 Action",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        250,
+        690
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "3dce6e60-b803-531c-9b03-0669906dff6b",
+              "leftValue": "={{ $json.m365.status === 'delete' }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "ba9776df-4391-52fc-8289-c49ceec6defa",
+      "name": "Delete in M365?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        500,
+        690
+      ]
+    },
+    {
+      "parameters": {
+        "method": "DELETE",
+        "url": "=https://graph.microsoft.com/v1.0/users/{{ $json.m365.id }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "microsoftEntraOAuth2Api",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          }
+        }
+      },
+      "id": "545f5c8e-b4c0-53f8-b69d-7aa7e32738cc",
+      "name": "[M365] Delete User",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        750,
+        690
+      ],
+      "onError": "continueRegularOutput",
+      "credentials": {
+        "microsoftEntraOAuth2Api": {
+          "id": "<ENTRA_CRED>",
+          "name": "Microsoft Entra ID (Azure Active Directory) account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Підсумок по заявці: звіт по кожній системі, техніка, диск, звірка логінів; рішення, чи закривати.\n// Закриваємо лише коли: немає проблем, диск вирішено, IT підтвердив «Заборгованості по техніці немає».\n// Якщо доступи закрито раніше і зараз нічого не змінено: короткий коментар. Той самий коментар двічі не пишемо.\nconst c0 = $('Code: Decide M365 Action').first().json;\nconst r = $input.first().json;\nconst m365 = { ...c0.m365 };\nif (m365.status === 'delete') {\n  const code = Number(r.statusCode);\n  if (code >= 200 && code < 300) m365.result = 'deleted';\n  else { m365.result = 'error'; m365.error = `${code || 'немає відповіді'}: ${(r.body && r.body.error && r.body.error.message) || 'не видалено'}`; }\n} else m365.result = m365.status;\nconst c = { ...c0, m365 };\nconst state = $getWorkflowStaticData('global');\nstate.notified = state.notified || {};\nconst who = c.pairs[0].join(' ');\nconst problems = [], pending = [];\nconst pat = c.ad.by_login_pattern ? ' (ім’я/прізвище в AD не заповнені, знайдено за шаблоном логіна)' : '';\n\nconst AD = {\n  disabled: () => `Акаунт ${c.ad.login} заблоковано та переміщено в OU «Уволенные».${pat}`,\n  already_done: () => `Акаунт ${c.ad.login} уже був заблокований (OU «Уволенные»).${pat}`,\n  not_found: () => `Акаунт за ім'ям «${who}» не знайдено (можливо, вже видалено).`,\n  multiple: () => { problems.push('AD: кілька акаунтів'); return `Знайдено кілька акаунтів: ${c.ad.candidates}. Нічого не змінено, визначте потрібний вручну.`; },\n  outside_scope: () => { problems.push('AD: акаунт поза OU=AllUsers'); return `Акаунт знайдено поза OU=AllUsers (${c.ad.dn}). Нічого не змінено, потрібна ручна перевірка.`; },\n  fired_but_enabled: () => { problems.push('AD: у «Уволенные», але активний'); return `Акаунт ${c.ad.login} уже в OU «Уволенные», але не заблокований. Заблокуйте вручну.`; },\n  error: () => { problems.push('AD: помилка'); return `НЕ виконано (${c.ad.error}). Перевірте права сервісного облікового запису n8n в AD.`; },\n};\nconst GOOGLE = {\n  suspended: () => `Акаунт ${c.google.email} призупинено (Suspended).`,\n  already_suspended: () => `Акаунт ${c.google.email} уже був призупинений.`,\n  not_found: () => { problems.push('Google: акаунт не знайдено'); return `Акаунт за ім'ям «${who}» не знайдено. Якщо ім'я в Google записане інакше, призупиніть акаунт вручну; якщо акаунт уже видалено, закрийте заявку вручну.`; },\n  multiple: () => { problems.push('Google: кілька акаунтів'); return `Знайдено кілька акаунтів: ${c.google.candidates}. Нічого не змінено, визначте потрібний вручну.`; },\n  error: () => { problems.push('Google: помилка'); return `НЕ виконано (${c.google.error}).`; },\n};\nconst d = c.drive;\nconst DRIVE = {\n  transferred: () => `• Диск: перенесення запущено (кому: ${d.recipient_name}, ${d.recipient_email}).`,\n  done_before: () => '• Диск: перенесення було запущено раніше.',\n  not_needed: () => `• Диск: передавати не потрібно (у заявці: «${d.text}»).`,\n  ask: () => { pending.push('підтвердження передачі диска');\n    return `• Передати диск: ${d.recipient_name} (${d.recipient_email})?\\n  У заявці: «${d.text}». Якщо так, дайте відповідь коментарем «так», і автоматизація передасть диск під час наступного запуску.`; },\n  recipient_not_found: () => { pending.push('отримувач диска');\n    return `• Диск: отримувача ${d.email} не знайдено в Google (або він призупинений). Вкажіть актуальний e-mail у рядку «Переадресація диску: ...».`; },\n  recipient_name_not_found: () => { pending.push('отримувач диска');\n    return `• Диск: кому передати, вказано як «${d.text}», але в Google такого працівника не знайдено. Вкажіть e-mail у рядку «Переадресація диску: ...».`; },\n  recipient_multiple: () => { pending.push('отримувач диска');\n    return `• Диск: за «${d.text}» знайдено кількох: ${d.candidates}. Вкажіть e-mail у рядку «Переадресація диску: ...».`; },\n  unknown_target: () => { pending.push('отримувач диска');\n    return `• Диск: не зрозуміло, кому передати (у заявці: «${d.text}»). Вкажіть e-mail у рядку «Переадресація диску: ...» або напишіть «не потрібно».`; },\n  no_leaver_account: () => '• Диск: не виконувалось (акаунт Google працівника не знайдено).',\n  error: () => { problems.push('Google Диск: помилка'); return `• Диск: перенесення НЕ запущено (${d.error}).`; },\n};\nconst M365 = {\n  deleted: () => `Акаунт ${c.m365.upn} видалено.`,\n  not_found: () => `Акаунта за ім'ям «${who}» немає, видаляти нічого.`,\n  multiple: () => { problems.push('M365: кілька акаунтів'); return `Знайдено кілька акаунтів: ${c.m365.candidates}. Нічого не видалено, визначте потрібний вручну.`; },\n  error: () => { problems.push('M365: помилка'); return `НЕ виконано (${c.m365.error}).`; },\n};\nlet eq;\nif (c.equipment === 'ok') eq = 'IT підтвердив: заборгованості по техніці немає.';\nelse if (c.equipment === 'debt') { pending.push('повернення техніки'); eq = `За працівником числиться техніка (коментар у заявці: «${c.equipment_note.slice(0, 200)}»).`; }\nelse { pending.push('підтвердження IT щодо техніки'); eq = 'Підтвердження IT щодо техніки ще немає. Коли техніку перевірено, напишіть коментар «Заборгованості по техніці немає».'; }\n\nconst lines = {\n  ad: AD[c.ad.result](), google: GOOGLE[c.google.result](), drive: DRIVE[d.result](), m365: M365[c.m365.result](),\n};\n// Звірка логінів між системами: різні логіни можуть означати, що знайдено різних людей.\nconst logins = [c.ad.login, (c.google.email || '').split('@')[0], (c.m365.upn || '').split('@')[0]].filter(Boolean).map(s => s.toLowerCase());\nconst warn = new Set(logins).size > 1 ? `\\n⚠ Логіни в системах відрізняються (${[...new Set(logins)].join(', ')}). Перевірте, що це одна й та сама людина.\\n` : '';\n\nconst close = !problems.length && !pending.length;\nconst acted = c.ad.result === 'disabled' || c.google.result === 'suspended' || d.result === 'transferred' || c.m365.result === 'deleted';\nconst tail = 'Автоматизація перевіряє заявку щодня о 18:00; той самий коментар повторно не пише.';\n\nlet note;\nif (c.prior_report && !acted && !problems.length) {\n  note = close\n    ? 'Автоматичний offboarding: доступи закрито раніше (див. попередній звіт). IT підтвердив, що заборгованості по техніці немає. Заявку закрито.'\n    : `Автоматичний offboarding: доступи закрито раніше (див. попередній звіт), повторно нічого не виконувалось.\\nЗаявку залишено відкритою, бо очікується: ${pending.join(', ')}.\\n${eq}\\n${['ask', 'recipient_not_found', 'recipient_name_not_found', 'recipient_multiple', 'unknown_target'].includes(d.result) ? lines.drive + '\\n' : ''}\\n${tail}`;\n} else {\n  const head = close ? 'Автоматичний offboarding: доступи закрито, заявку закрито.'\n    : problems.length ? '⚠ Автоматичний offboarding виконано частково, потрібна ручна дія.'\n    : 'Автоматичний offboarding: доступи закрито, заявку залишено відкритою.';\n  note = `${head}\\n\\nЗвіт про закриття доступів (працівник: ${c.person}):\\n` +\n    `1. Active Directory: ${lines.ad}\\n2. Google Workspace: ${lines.google}\\n${lines.drive}\\n3. Microsoft 365: ${lines.m365}\\n4. Техніка: ${eq}\\n` + warn +\n    (close ? '\\nЗапис додано до архівного реєстру Google Sheets.' :\n      `\\nЩо залишилось: ${[...problems, ...pending].join('; ')}.\\nЗаявку залишено відкритою. ${tail}`);\n}\n\nconst key = (close ? 'close|' : 'open|') + note.replace(/\\d{4}-\\d{2}-\\d{2}/g, '');\nconst notify = close || state.notified[c.id] !== key;\nif (close) delete state.notified[c.id]; else state.notified[c.id] = key;\n\n// В архів пишемо лише при першому закритті (не після переоткриття заявки).\nreturn [{ json: { id: c.id, close, archive: close && !c.prior_report, notify, note, leaver_date: c.leaver_date,\n  login: c.ad.login || c.google.email || c.person, google_email: c.google.email || '' }, pairedItem: { item: 0 } }];\n"
+      },
+      "id": "1c4a7d49-8211-50a8-bb12-c966e6d92823",
+      "name": "Code: Build Report",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1000,
+        690
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "b09cbcea-af17-5ae7-9043-50dc87f8f71a",
+              "leftValue": "={{ $json.notify }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "720cfdb8-8041-5eb4-92a5-5b6a31a7966b",
+      "name": "Update Ticket Needed?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1250,
+        690
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "issueId": "={{ $json.id }}",
+        "notes": "={{ $json.note }}",
+        "additionalFields": {
+          "status_id": "={{ $json.close ? '17' : undefined }}"
+        },
+        "options": {}
+      },
+      "id": "55f42a20-8fdc-5fde-b62e-aaf2e8804b8e",
+      "name": "[Redmine] Update Ticket",
+      "type": "n8n-nodes-redmine.redmine",
+      "typeVersion": 1,
+      "position": [
+        1500,
+        690
+      ],
+      "credentials": {
+        "redmineApi": {
+          "id": "<REDMINE_CRED>",
+          "name": "Redmine bot account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "765378e4-94ee-52b2-af00-73d4d11f9ce0",
+              "leftValue": "={{ $('Code: Build Report').item.json.archive }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "45a2ac13-457e-5635-a095-b92523745074",
+      "name": "Add to Archive?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1750,
+        690
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "<ARCHIVE_SHEET_ID>",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Date": "={{ $('Code: Build Report').item.json.leaver_date }}",
+            "Login": "={{ $('Code: Build Report').item.json.login }}",
+            "Ticket ID": "={{ $('Code: Build Report').item.json.id }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Date",
+              "displayName": "Date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Login",
+              "displayName": "Login",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Ticket ID",
+              "displayName": "Ticket ID",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Google guest account ",
+              "displayName": "Google guest account ",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "e53d9cf8-2643-5550-8183-c2211b449f3a",
+      "name": "[Sheets] Add to Archive",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [
+        1750,
+        920
+      ],
+      "retryOnFail": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "<SHEETS_CRED>",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "## 🛡️ [PROD] Offboarding адмін-персоналу (Admin | Leaver)\nAD, Google Workspace (призупинення + передача диска), Microsoft 365, звіт у Redmine, архів у Google Sheets.\n\n**Розклад:** щодня о 18:00 (Europe/Kyiv).\n\n**Пошук людини** в кожній системі за ім'ям і прізвищем (поле Contractor (ENG), інакше UKR латиницею за КМУ-2010), в обох порядках. Логін не вгадується. Дія лише при **єдиному** збігу; кілька або жодного: коментар, нічого не змінюємо.\n* AD: блокування (ACCOUNTDISABLE, інші прапорці не чіпаємо) і перенос в «Уволенные», лише для OU=AllUsers.\n* Google: Suspended. Диск: на e-mail із заявки одразу; якщо вказано лише ім'я (або нічого, тоді менеджер із поля Manager), флоу пропонує людину в коментарі й передає після відповіді «так».\n* M365: видалення лише члена тенанта (не гостей #EXT#).\n\n**Закриття заявки** (статус 17) лише коли: немає проблем, диск вирішено, і в заявці є коментар IT «Заборгованості по техніці немає». «Закріплений ноутбук» або немає підтвердження: доступи закриваємо, заявка відкрита.\n**Без дати звільнення** нічого не робимо, пишемо коментар. Повторний запуск після закриття доступів: лише короткий коментар. Той самий коментар двічі не пишемо (static data).\n**Помилки:** Error Workflow.",
+        "height": 700,
+        "width": 700,
+        "color": 6
+      },
+      "id": "2e007f51-f089-5496-b904-c34cd623193b",
+      "name": "Sticky Note: Overview",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        0,
+        -780
+      ]
+    }
+  ],
+  "connections": {
+    "Every Day 18:00": {
+      "main": [
+        [
+          {
+            "node": "[Redmine] Get Open Leaver Tickets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "[Redmine] Get Open Leaver Tickets": {
+      "main": [
+        [
+          {
+            "node": "Code: Parse Tickets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code: Parse Tickets": {
+      "main": [
+        [
+          {
+            "node": "Ticket Ready?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ticket Ready?": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Tickets",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "[Redmine] Comment Missing Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Tickets": {
+      "main": [
+        [],
+        [
+          {
+            "node": "[Redmine] Get Ticket History",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "[Redmine] Get Ticket History": {
+      "main": [
+        [
+          {
+            "node": "[AD] Search User",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "[AD] Search User": {
+      "main": [
+        [
+          {
+            "node": "Code: Decide AD Action",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code: Decide AD Action": {
+      "main": [
+        [
+          {
+            "node": "Disable in AD?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Disable in AD?": {
+      "main": [
+        [
+          {
+            "node": "[AD] Disable Account",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Code: Prepare Google Search",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "[AD] Disable Account": {
+      "main": [
+        [
+          {
+            "node": "Disabled OK?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Disabled OK?": {
+      "main": [
+        [
+          {
+            "node": "[AD] Move to Fired OU",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Code: Prepare Google Search",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "[AD] Move to Fired OU": {
+      "main": [
+        [
+          {
+            "node": "Code: Prepare Google Search",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code: Prepare Google Search": {
+      "main": [
+        [
+          {
+            "node": "[Google] Find User",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "[Google] Find User": {
+      "main": [
+        [
+          {
+            "node": "Code: Decide Google Action",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code: Decide Google Action": {
+      "main": [
+        [
+          {
+            "node": "Suspend in Google?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Suspend in Google?": {
+      "main": [
+        [
+          {
+            "node": "[Google] Suspend User",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Code: Prepare Drive Transfer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "[Google] Suspend User": {
+      "main": [
+        [
+          {
+            "node": "Code: Prepare Drive Transfer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code: Prepare Drive Transfer": {
+      "main": [
+        [
+          {
+            "node": "Recipient Lookup Needed?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Recipient Lookup Needed?": {
+      "main": [
+        [
+          {
+            "node": "[Google] Find Drive Recipient",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Code: Decide Drive Action",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "[Google] Find Drive Recipient": {
+      "main": [
+        [
+          {
+            "node": "Code: Decide Drive Action",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code: Decide Drive Action": {
+      "main": [
+        [
+          {
+            "node": "Transfer Drive?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Transfer Drive?": {
+      "main": [
+        [
+          {
+            "node": "[Google] Transfer Drive",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Code: Prepare M365 Search",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "[Google] Transfer Drive": {
+      "main": [
+        [
+          {
+            "node": "Code: Prepare M365 Search",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code: Prepare M365 Search": {
+      "main": [
+        [
+          {
+            "node": "[M365] Search User",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "[M365] Search User": {
+      "main": [
+        [
+          {
+            "node": "Code: Decide M365 Action",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code: Decide M365 Action": {
+      "main": [
+        [
+          {
+            "node": "Delete in M365?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Delete in M365?": {
+      "main": [
+        [
+          {
+            "node": "[M365] Delete User",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Code: Build Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "[M365] Delete User": {
+      "main": [
+        [
+          {
+            "node": "Code: Build Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code: Build Report": {
+      "main": [
+        [
+          {
+            "node": "Update Ticket Needed?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Ticket Needed?": {
+      "main": [
+        [
+          {
+            "node": "[Redmine] Update Ticket",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Loop Over Tickets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "[Redmine] Update Ticket": {
+      "main": [
+        [
+          {
+            "node": "Add to Archive?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Add to Archive?": {
+      "main": [
+        [
+          {
+            "node": "[Sheets] Add to Archive",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Loop Over Tickets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "[Sheets] Add to Archive": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Tickets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Europe/Kyiv",
+    "errorWorkflow": "<ERROR_WORKFLOW_ID>",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": true
+  }
+}

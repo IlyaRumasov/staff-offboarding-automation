@@ -1,0 +1,4606 @@
+[
+ {
+  "name": "щасливий шлях: AD, Google, диск на e-mail, M365, техніка ок -> закрито",
+  "stubs": {
+   "[Redmine] Get Open Leaver Tickets": [
+    {
+     "issues": [
+      {
+       "id": 301,
+       "tracker": {
+        "id": 25,
+        "name": "Admin | Leaver"
+       },
+       "status": {
+        "id": 1,
+        "name": "New"
+       },
+       "subject": "Admin Leaver - Ivan Testovenko",
+       "description": "Доброго дня!\r\nПрошу запустити процес припинення співпраці з Ivan Testovenko/Trainer/Lutsk\r\nПереадресація пошти: видалити\r\nПереадресація диску: recv.person@corp.example.com\r\n\r\nДякую.",
+       "custom_fields": [
+        {
+         "id": 11,
+         "name": "Contractor (ENG)",
+         "value": "Ivan Testovenko"
+        },
+        {
+         "id": 103,
+         "name": "Contractor (UKR)",
+         "value": "Тестовенко Іван"
+        },
+        {
+         "id": 25,
+         "name": "Manager",
+         "value": "Mariia Probna"
+        },
+        {
+         "id": 30,
+         "name": "Termination date",
+         "value": "$YESTERDAY"
+        }
+       ]
+      }
+     ],
+     "total_count": 1
+    }
+   ],
+   "[Redmine] Get Ticket History": {
+    "__by_ticket": {
+     "301": {
+      "issue": {
+       "status": {
+        "id": 1
+       },
+       "journals": [
+        {
+         "id": 0,
+         "notes": "Заборгованості по техніці немає",
+         "user": {
+          "name": "IT"
+         }
+        }
+       ]
+      }
+     }
+    }
+   },
+   "[AD] Search User": {
+    "__by_ticket": {
+     "301": [
+      {
+       "dn": "CN=Ivan Testovenko,OU=administrative_staff,OU=AllUsers,OU=COMPANY,DC=example,DC=com",
+       "sAMAccountName": "ivan.testovenko",
+       "givenName": "Ivan",
+       "sn": "Testovenko",
+       "userAccountControl": "512"
+      }
+     ]
+    }
+   },
+   "[Google] Find User": {
+    "__by_ticket": {
+     "301": {
+      "statusCode": 200,
+      "body": {
+       "users": [
+        {
+         "id": "g-ivan.testovenko",
+         "primaryEmail": "ivan.testovenko@corp.example.com",
+         "name": {
+          "fullName": "Ivan Testovenko"
+         },
+         "suspended": false
+        }
+       ]
+      }
+     }
+    }
+   },
+   "[Google] Find Drive Recipient": {
+    "__by_ticket": {
+     "301": {
+      "statusCode": 200,
+      "body": {
+       "id": "g-recv.person",
+       "primaryEmail": "recv.person@corp.example.com",
+       "name": {
+        "fullName": "Recv Person"
+       },
+       "suspended": false
+      }
+     }
+    }
+   },
+   "[M365] Search User": {
+    "__by_ticket": {
+     "301": {
+      "statusCode": 200,
+      "body": {
+       "value": [
+        {
+         "id": "m-ivan.testovenko",
+         "userPrincipalName": "ivan.testovenko@m365.example.com",
+         "userType": "Member"
+        }
+       ]
+      }
+     }
+    }
+   },
+   "[Google] Suspend User": {
+    "statusCode": 200,
+    "body": {
+     "suspended": true
+    }
+   },
+   "[Google] Transfer Drive": {
+    "statusCode": 200,
+    "body": {
+     "overallTransferStatusCode": "inProgress"
+    }
+   },
+   "[M365] Delete User": {
+    "statusCode": 204,
+    "body": ""
+   }
+  },
+  "counts": {
+   "[AD] Disable Account": 1,
+   "[AD] Move to Fired OU": 1,
+   "[Google] Suspend User": 1,
+   "[Google] Transfer Drive": 1,
+   "[M365] Delete User": 1,
+   "[Redmine] Update Ticket": 1,
+   "[Sheets] Add to Archive": 1,
+   "[Redmine] Comment Missing Data": 0
+  },
+  "has": {
+   "Code: Build Report": [
+    {
+     "close": true,
+     "note": "~доступи закрито, заявку закрито"
+    },
+    {
+     "note": "~Акаунт ivan.testovenko заблоковано"
+    },
+    {
+     "note": "~Диск: перенесення запущено (кому: Recv Person, recv.person@corp.example.com)"
+    },
+    {
+     "note": "~Акаунт ivan.testovenko@m365.example.com видалено"
+    },
+    {
+     "note": "~IT підтвердив"
+    }
+   ],
+   "Code: Decide AD Action": [
+    {
+     "ad": {
+      "status": "disable",
+      "dn": "CN=Ivan Testovenko,OU=administrative_staff,OU=AllUsers,OU=COMPANY,DC=example,DC=com",
+      "target_dn": "CN=Ivan Testovenko,OU=Уволенные,DC=example,DC=com",
+      "new_uac": "514",
+      "login": "ivan.testovenko",
+      "candidates": "ivan.testovenko (administrative_staff, активний)",
+      "by_login_pattern": false
+     }
+    }
+   ]
+  }
+ },
+ {
+  "name": "за працівником ноутбук: доступи закриваємо, заявка відкрита",
+  "stubs": {
+   "[Redmine] Get Open Leaver Tickets": [
+    {
+     "issues": [
+      {
+       "id": 302,
+       "tracker": {
+        "id": 25,
+        "name": "Admin | Leaver"
+       },
+       "status": {
+        "id": 1,
+        "name": "New"
+       },
+       "subject": "Admin Leaver - Ivan Testovenko",
+       "description": "Доброго дня!\r\nПрошу запустити процес припинення співпраці з Ivan Testovenko/Trainer/Lutsk\r\nПереадресація пошти: видалити\r\nПереадресація диску: recv.person@corp.example.com\r\n\r\nДякую.",
+       "custom_fields": [
+        {
+         "id": 11,
+         "name": "Contractor (ENG)",
+         "value": "Ivan Testovenko"
+        },
+        {
+         "id": 103,
+         "name": "Contractor (UKR)",
+         "value": "Тестовенко Іван"
+        },
+        {
+         "id": 25,
+         "name": "Manager",
+         "value": "Mariia Probna"
+        },
+        {
+         "id": 30,
+         "name": "Termination date",
+         "value": "$YESTERDAY"
+        }
+       ]
+      }
+     ],
+     "total_count": 1
+    }
+   ],
+   "[Redmine] Get Ticket History": {
+    "__by_ticket": {
+     "302": {
+      "issue": {
+       "status": {
+        "id": 1
+       },
+       "journals": [
+        {
+         "id": 0,
+         "notes": "Добрий день. За Іваном закріплений ноутбук 2000000000001",
+         "user": {
+          "name": "IT"
+         }
+        }
+       ]
+      }
+     }
+    }
+   },
+   "[AD] Search User": {
+    "__by_ticket": {
+     "302": [
+      {
+       "dn": "CN=Ivan Testovenko,OU=administrative_staff,OU=AllUsers,OU=COMPANY,DC=example,DC=com",
+       "sAMAccountName": "ivan.testovenko",
+       "givenName": "Ivan",
+       "sn": "Testovenko",
+       "userAccountControl": "512"
+      }
+     ]
+    }
+   },
+   "[Google] Find User": {
+    "__by_ticket": {
+     "302": {
+      "statusCode": 200,
+      "body": {
+       "users": [
+        {
+         "id": "g-ivan.testovenko",
+         "primaryEmail": "ivan.testovenko@corp.example.com",
+         "name": {
+          "fullName": "Ivan Testovenko"
+         },
+         "suspended": false
+        }
+       ]
+      }
+     }
+    }
+   },
+   "[Google] Find Drive Recipient": {
+    "__by_ticket": {
+     "302": {
+      "statusCode": 200,
+      "body": {
+       "id": "g-recv.person",
+       "primaryEmail": "recv.person@corp.example.com",
+       "name": {
+        "fullName": "Recv Person"
+       },
+       "suspended": false
+      }
+     }
+    }
+   },
+   "[M365] Search User": {
+    "__by_ticket": {
+     "302": {
+      "statusCode": 200,
+      "body": {
+       "value": [
+        {
+         "id": "m-ivan.testovenko",
+         "userPrincipalName": "ivan.testovenko@m365.example.com",
+         "userType": "Member"
+        }
+       ]
+      }
+     }
+    }
+   },
+   "[Google] Suspend User": {
+    "statusCode": 200,
+    "body": {
+     "suspended": true
+    }
+   },
+   "[Google] Transfer Drive": {
+    "statusCode": 200,
+    "body": {
+     "overallTransferStatusCode": "inProgress"
+    }
+   },
+   "[M365] Delete User": {
+    "statusCode": 204,
+    "body": ""
+   }
+  },
+  "counts": {
+   "[AD] Disable Account": 1,
+   "[Google] Suspend User": 1,
+   "[Google] Transfer Drive": 1,
+   "[M365] Delete User": 1,
+   "[Redmine] Update Ticket": 1,
+   "[Sheets] Add to Archive": 0
+  },
+  "has": {
+   "Code: Build Report": [
+    {
+     "close": false,
+     "note": "~числиться техніка"
+    },
+    {
+     "note": "~заявку залишено відкритою"
+    }
+   ]
+  }
+ },
+ {
+  "name": "немає підтвердження IT щодо техніки: відкрита",
+  "stubs": {
+   "[Redmine] Get Open Leaver Tickets": [
+    {
+     "issues": [
+      {
+       "id": 303,
+       "tracker": {
+        "id": 25,
+        "name": "Admin | Leaver"
+       },
+       "status": {
+        "id": 1,
+        "name": "New"
+       },
+       "subject": "Admin Leaver - Ivan Testovenko",
+       "description": "Доброго дня!\r\nПрошу запустити процес припинення співпраці з Ivan Testovenko/Trainer/Lutsk\r\nПереадресація пошти: видалити\r\nПереадресація диску: recv.person@corp.example.com\r\n\r\nДякую.",
+       "custom_fields": [
+        {
+         "id": 11,
+         "name": "Contractor (ENG)",
+         "value": "Ivan Testovenko"
+        },
+        {
+         "id": 103,
+         "name": "Contractor (UKR)",
+         "value": "Тестовенко Іван"
+        },
+        {
+         "id": 25,
+         "name": "Manager",
+         "value": "Mariia Probna"
+        },
+        {
+         "id": 30,
+         "name": "Termination date",
+         "value": "$YESTERDAY"
+        }
+       ]
+      }
+     ],
+     "total_count": 1
+    }
+   ],
+   "[Redmine] Get Ticket History": {
+    "__by_ticket": {
+     "303": {
+      "issue": {
+       "status": {
+        "id": 1
+       },
+       "journals": []
+      }
+     }
+    }
+   },
+   "[AD] Search User": {
+    "__by_ticket": {
+     "303": [
+      {
+       "dn": "CN=Ivan Testovenko,OU=administrative_staff,OU=AllUsers,OU=COMPANY,DC=example,DC=com",
+       "sAMAccountName": "ivan.testovenko",
+       "givenName": "Ivan",
+       "sn": "Testovenko",
+       "userAccountControl": "512"
+      }
+     ]
+    }
+   },
+   "[Google] Find User": {
+    "__by_ticket": {
+     "303": {
+      "statusCode": 200,
+      "body": {
+       "users": [
+        {
+         "id": "g-ivan.testovenko",
+         "primaryEmail": "ivan.testovenko@corp.example.com",
+         "name": {
+          "fullName": "Ivan Testovenko"
+         },
+         "suspended": false
+        }
+       ]
+      }
+     }
+    }
+   },
+   "[Google] Find Drive Recipient": {
+    "__by_ticket": {
+     "303": {
+      "statusCode": 200,
+      "body": {
+       "id": "g-recv.person",
+       "primaryEmail": "recv.person@corp.example.com",
+       "name": {
+        "fullName": "Recv Person"
+       },
+       "suspended": false
+      }
+     }
+    }
+   },
+   "[M365] Search User": {
+    "__by_ticket": {
+     "303": {
+      "statusCode": 200,
+      "body": {
+       "value": [
+        {
+         "id": "m-ivan.testovenko",
+         "userPrincipalName": "ivan.testovenko@m365.example.com",
+         "userType": "Member"
+        }
+       ]
+      }
+     }
+    }
+   },
+   "[Google] Suspend User": {
+    "statusCode": 200,
+    "body": {
+     "suspended": true
+    }
+   },
+   "[Google] Transfer Drive": {
+    "statusCode": 200,
+    "body": {
+     "overallTransferStatusCode": "inProgress"
+    }
+   },
+   "[M365] Delete User": {
+    "statusCode": 204,
+    "body": ""
+   }
+  },
+  "has": {
+   "Code: Build Report": [
+    {
+     "close": false,
+     "note": "~Підтвердження IT щодо техніки ще немає"
+    }
+   ]
+  }
+ },
+ {
+  "name": "старий бот писав «Заборгованості немає» у своєму звіті: не рахуємо",
+  "stubs": {
+   "[Redmine] Get Open Leaver Tickets": [
+    {
+     "issues": [
+      {
+       "id": 304,
+       "tracker": {
+        "id": 25,
+        "name": "Admin | Leaver"
+       },
+       "status": {
+        "id": 1,
+        "name": "New"
+       },
+       "subject": "Admin Leaver - Ivan Testovenko",
+       "description": "Доброго дня!\r\nПрошу запустити процес припинення співпраці з Ivan Testovenko/Trainer/Lutsk\r\nПереадресація пошти: видалити\r\nПереадресація диску: recv.person@corp.example.com\r\n\r\nДякую.",
+       "custom_fields": [
+        {
+         "id": 11,
+         "name": "Contractor (ENG)",
+         "value": "Ivan Testovenko"
+        },
+        {
+         "id": 103,
+         "name": "Contractor (UKR)",
+         "value": "Тестовенко Іван"
+        },
+        {
+         "id": 25,
+         "name": "Manager",
+         "value": "Mariia Probna"
+        },
+        {
+         "id": 30,
+         "name": "Termination date",
+         "value": "$YESTERDAY"
+        }
+       ]
+      }
+     ],
+     "total_count": 1
+    }
+   ],
+   "[Redmine] Get Ticket History": {
+    "__by_ticket": {
+     "304": {
+      "issue": {
+       "status": {
+        "id": 1
+       },
+       "journals": [
+        {
+         "id": 0,
+         "notes": "Автоматичний Offboarding успішно завершено!\n\nДетальний звіт про закриття доступів:\n1. Active Directory: ...\n3. Google Диск (Перенесення документів):\n   • Новий власник (керівник): x@corp.example.com\n   • Статус: Успішно ініційовано системою.\nЗаборгованості по техніці немає.",
+         "user": {
+          "name": "Automation Bot"
+         }
+        }
+       ]
+      }
+     }
+    }
+   },
+   "[AD] Search User": {
+    "__by_ticket": {
+     "304": [
+      {
+       "dn": "CN=Ivan Testovenko,OU=administrative_staff,OU=AllUsers,OU=COMPANY,DC=example,DC=com",
+       "sAMAccountName": "ivan.testovenko",
+       "givenName": "Ivan",
+       "sn": "Testovenko",
+       "userAccountControl": "512"
+      }
+     ]
+    }
+   },
+   "[Google] Find User": {
+    "__by_ticket": {
+     "304": {
+      "statusCode": 200,
+      "body": {
+       "users": [
+        {
+         "id": "g-ivan.testovenko",
+         "primaryEmail": "ivan.testovenko@corp.example.com",
+         "name": {
+          "fullName": "Ivan Testovenko"
+         },
+         "suspended": false
+        }
+       ]
+      }
+     }
+    }
+   },
+   "[Google] Find Drive Recipient": {
+    "__by_ticket": {
+     "304": {
+      "statusCode": 200,
+      "body": {
+       "id": "g-recv.person",
+       "primaryEmail": "recv.person@corp.example.com",
+       "name": {
+        "fullName": "Recv Person"
+       },
+       "suspended": false
+      }
+     }
+    }
+   },
+   "[M365] Search User": {
+    "__by_ticket": {
+     "304": {
+      "statusCode": 200,
+      "body": {
+       "value": [
+        {
+         "id": "m-ivan.testovenko",
+         "userPrincipalName": "ivan.testovenko@m365.example.com",
+         "userType": "Member"
+        }
+       ]
+      }
+     }
+    }
+   },
+   "[Google] Suspend User": {
+    "statusCode": 200,
+    "body": {
+     "suspended": true
+    }
+   },
+   "[Google] Transfer Drive": {
+    "statusCode": 200,
+    "body": {
+     "overallTransferStatusCode": "inProgress"
+    }
+   },
+   "[M365] Delete User": {
+    "statusCode": 204,
+    "body": ""
+   }
+  },
+  "has": {
+   "Code: Prepare Drive Transfer": [
+    {
+     "equipment": "unknown",
+     "prior_report": true
+    }
+   ]
+  }
+ },
+ {
+  "name": "ноутбук, потім IT: «Заборгованості немає» -> останній коментар вирішує",
+  "stubs": {
+   "[Redmine] Get Open Leaver Tickets": [
+    {
+     "issues": [
+      {
+       "id": 305,
+       "tracker": {
+        "id": 25,
+        "name": "Admin | Leaver"
+       },
+       "status": {
+        "id": 1,
+        "name": "New"
+       },
+       "subject": "Admin Leaver - Ivan Testovenko",
+       "description": "Доброго дня!\r\nПрошу запустити процес припинення співпраці з Ivan Testovenko/Trainer/Lutsk\r\nПереадресація пошти: видалити\r\nПереадресація диску: recv.person@corp.example.com\r\n\r\nДякую.",
+       "custom_fields": [
+        {
+         "id": 11,
+         "name": "Contractor (ENG)",
+         "value": "Ivan Testovenko"
+        },
+        {
+         "id": 103,
+         "name": "Contractor (UKR)",
+         "value": "Тестовенко Іван"
+        },
+        {
+         "id": 25,
+         "name": "Manager",
+         "value": "Mariia Probna"
+        },
+        {
+         "id": 30,
+         "name": "Termination date",
+         "value": "$YESTERDAY"
+        }
+       ]
+      }
+     ],
+     "total_count": 1
+    }
+   ],
+   "[Redmine] Get Ticket History": {
+    "__by_ticket": {
+     "305": {
+      "issue": {
+       "status": {
+        "id": 1
+       },
+       "journals": [
+        {
+         "id": 0,
+         "notes": "Добрий день. За Іваном закріплений ноутбук 2000000000001",
+         "user": {
+          "name": "IT"
+         }
+        },
+        {
+         "id": 1,
+         "notes": "Техніку повернуто. Заборгованості по техніці немає",
+         "user": {
+          "name": "IT"
+         }
+        }
+       ]
+      }
+     }
+    }
+   },
+   "[AD] Search User": {
+    "__by_ticket": {
+     "305": [
+      {
+       "dn": "CN=Ivan Testovenko,OU=administrative_staff,OU=AllUsers,OU=COMPANY,DC=example,DC=com",
+       "sAMAccountName": "ivan.testovenko",
+       "givenName": "Ivan",
+       "sn": "Testovenko",
+       "userAccountControl": "512"
+      }
+     ]
+    }
+   },
+   "[Google] Find User": {
+    "__by_ticket": {
+     "305": {
+      "statusCode": 200,
+      "body": {
+       "users": [
+        {
+         "id": "g-ivan.testovenko",
+         "primaryEmail": "ivan.testovenko@corp.example.com",
+         "name": {
+          "fullName": "Ivan Testovenko"
+         },
+         "suspended": false
+        }
+       ]
+      }
+     }
+    }
+   },
+   "[Google] Find Drive Recipient": {
+    "__by_ticket": {
+     "305": {
+      "statusCode": 200,
+      "body": {
+       "id": "g-recv.person",
+       "primaryEmail": "recv.person@corp.example.com",
+       "name": {
+        "fullName": "Recv Person"
+       },
+       "suspended": false
+      }
+     }
+    }
+   },
+   "[M365] Search User": {
+    "__by_ticket": {
+     "305": {
+      "statusCode": 200,
+      "body": {
+       "value": [
+        {
+         "id": "m-ivan.testovenko",
+         "userPrincipalName": "ivan.testovenko@m365.example.com",
+         "userType": "Member"
+        }
+       ]
+      }
+     }
+    }
+   },
+   "[Google] Suspend User": {
+    "statusCode": 200,
+    "body": {
+     "suspended": true
+    }
+   },
+   "[Google] Transfer Drive": {
+    "statusCode": 200,
+    "body": {
+     "overallTransferStatusCode": "inProgress"
+    }
+   },
+   "[M365] Delete User": {
+    "statusCode": 204,
+    "body": ""
+   }
+  },
+  "has": {
+   "Code: Prepare Drive Transfer": [
+    {
+     "equipment": "ok"
+    }
+   ],
+   "Code: Build Report": [
+    {
+     "close": true
+    }
+   ]
+  }
+ },
+ {
+  "name": "ім'я англ. у порядку «Прізвище Ім'я»: шукаємо обидва порядки",
+  "stubs": {
+   "[Redmine] Get Open Leaver Tickets": [
+    {
+     "issues": [
+      {
+       "id": 306,
+       "tracker": {
+        "id": 25,
+        "name": "Admin | Leaver"
+       },
+       "status": {
+        "id": 1,
+        "name": "New"
+       },
+       "subject": "Admin Leaver - Probenko Olha",
+       "description": "Доброго дня!\r\nПрошу запустити процес припинення співпраці з Probenko Olha/Trainer/Lutsk\r\nПереадресація пошти: видалити\r\nПереадресація диску: recv.person@corp.example.com\r\n\r\nДякую.",
+       "custom_fields": [
+        {
+         "id": 11,
+         "name": "Contractor (ENG)",
+         "value": "Probenko Olha"
+        },
+        {
+         "id": 103,
+         "name": "Contractor (UKR)",
+         "value": "Пробенко Ольга "
+        },
+        {
+         "id": 25,
+         "name": "Manager",
+         "value": "Mariia Probna"
+        },
+        {
+         "id": 30,
+         "name": "Termination date",
+         "value": "$YESTERDAY"
+        }
+       ]
+      }
+     ],
+     "total_count": 1
+    }
+   ],
+   "[Redmine] Get Ticket History": {
+    "__by_ticket": {
+     "306": {
+      "issue": {
+       "status": {
+        "id": 1
+       },
+       "journals": [
+        {
+         "id": 0,
+         "notes": "Заборгованості по техніці немає",
+         "user": {
+          "name": "IT"
+         }
+        }
+       ]
+      }
+     }
+    }
+   },
+   "[AD] Search User": {
+    "__by_ticket": {
+     "306": [
+      {
+       "dn": "CN=Ivan Testovenko,OU=administrative_staff,OU=AllUsers,OU=COMPANY,DC=example,DC=com",
+       "sAMAccountName": "ivan.testovenko",
+       "givenName": "Ivan",
+       "sn": "Testovenko",
+       "userAccountControl": "512"
+      }
+     ]
+    }
+   },
+   "[Google] Find User": {
+    "__by_ticket": {
+     "306": {
+      "statusCode": 200,
+      "body": {
+       "users": [
+        {
+         "id": "g-ivan.testovenko",
+         "primaryEmail": "ivan.testovenko@corp.example.com",
+         "name": {
+          "fullName": "Ivan Testovenko"
+         },
+         "suspended": false
+        }
+       ]
+      }
+     }
+    }
+   },
+   "[Google] Find Drive Recipient": {
+    "__by_ticket": {
+     "306": {
+      "statusCode": 200,
+      "body": {
+       "id": "g-recv.person",
+       "primaryEmail": "recv.person@corp.example.com",
+       "name": {
+        "fullName": "Recv Person"
+       },
+       "suspended": false
+      }
+     }
+    }
+   },
+   "[M365] Search User": {
+    "__by_ticket": {
+     "306": {
+      "statusCode": 200,
+      "body": {
+       "value": [
+        {
+         "id": "m-ivan.testovenko",
+         "userPrincipalName": "ivan.testovenko@m365.example.com",
+         "userType": "Member"
+        }
+       ]
+      }
+     }
+    }
+   },
+   "[Google] Suspend User": {
+    "statusCode": 200,
+    "body": {
+     "suspended": true
+    }
+   },
+   "[Google] Transfer Drive": {
+    "statusCode": 200,
+    "body": {
+     "overallTransferStatusCode": "inProgress"
+    }
+   },
+   "[M365] Delete User": {
+    "statusCode": 204,
+    "body": ""
+   }
+  },
+  "counts": {
+   "Code: Prepare Google Search": 2
+  },
+  "has": {
+   "Code: Parse Tickets": [
+    {
+     "pairs": [
+      [
+       "Probenko",
+       "Olha"
+      ],
+      [
+       "Olha",
+       "Probenko"
+      ]
+     ],
+     "ldap_filter": "(&(objectClass=user)(|(&(givenName=Probenko)(sn=Olha))(&(givenName=Olha)(sn=Probenko))(sAMAccountName=probenko.olha)(sAMAccountName=p.olha)(sAMAccountName=ms.p.olha)(sAMAccountName=ms.probenko.olha)(sAMAccountName=olha.probenko)(sAMAccountName=o.probenko)(sAMAccountName=ms.o.probenko)(sAMAccountName=ms.olha.probenko)))"
+    }
+   ]
+  }
+ },
+ {
+  "name": "англ. ім'я порожнє: беремо укр. латиницею",
+  "stubs": {
+   "[Redmine] Get Open Leaver Tickets": [
+    {
+     "issues": [
+      {
+       "id": 307,
+       "tracker": {
+        "id": 25,
+        "name": "Admin | Leaver"
+       },
+       "status": {
+        "id": 1,
+        "name": "New"
+       },
+       "subject": "Admin Leaver - ",
+       "description": "Доброго дня!\r\nПрошу запустити процес припинення співпраці з /Trainer/Lutsk\r\nПереадресація пошти: видалити\r\nПереадресація диску: recv.person@corp.example.com\r\n\r\nДякую.",
+       "custom_fields": [
+        {
+         "id": 11,
+         "name": "Contractor (ENG)",
+         "value": ""
+        },
+        {
+         "id": 103,
+         "name": "Contractor (UKR)",
+         "value": "Зразковий Олег"
+        },
+        {
+         "id": 25,
+         "name": "Manager",
+         "value": "Mariia Probna"
+        },
+        {
+         "id": 30,
+         "name": "Termination date",
+         "value": "$YESTERDAY"
+        }
+       ]
+      }
+     ],
+     "total_count": 1
+    }
+   ],
+   "[Redmine] Get Ticket History": {
+    "__by_ticket": {
+     "307": {
+      "issue": {
+       "status": {
+        "id": 1
+       },
+       "journals": [
+        {
+         "id": 0,
+         "notes": "Заборгованості по техніці немає",
+         "user": {
+          "name": "IT"
+         }
+        }
+       ]
+      }
+     }
+    }
+   },
+   "[AD] Search User": {
+    "__by_ticket": {
+     "307": [
+      {
+       "dn": "CN=Ivan Testovenko,OU=administrative_staff,OU=AllUsers,OU=COMPANY,DC=example,DC=com",
+       "sAMAccountName": "ivan.testovenko",
+       "givenName": "Ivan",
+       "sn": "Testovenko",
+       "userAccountControl": "512"
+      }
+     ]
+    }
+   },
+   "[Google] Find User": {
+    "__by_ticket": {
+     "307": {
+      "statusCode": 200,
+      "body": {
+       "users": [
+        {
+         "id": "g-ivan.testovenko",
+         "primaryEmail": "ivan.testovenko@corp.example.com",
+         "name": {
+          "fullName": "Ivan Testovenko"
+         },
+         "suspended": false
+        }
+       ]
+      }
+     }
+    }
+   },
+   "[Google] Find Drive Recipient": {
+    "__by_ticket": {
+     "307": {
+      "statusCode": 200,
+      "body": {
+       "id": "g-recv.person",
+       "primaryEmail": "recv.person@corp.example.com",
+       "name": {
+        "fullName": "Recv Person"
+       },
+       "suspended": false
+      }
+     }
+    }
+   },
+   "[M365] Search User": {
+    "__by_ticket": {
+     "307": {
+      "statusCode": 200,
+      "body": {
+       "value": [
+        {
+         "id": "m-ivan.testovenko",
+         "userPrincipalName": "ivan.testovenko@m365.example.com",
+         "userType": "Member"
+        }
+       ]
+      }
+     }
+    }
+   },
+   "[Google] Suspend User": {
+    "statusCode": 200,
+    "body": {
+     "suspended": true
+    }
+   },
+   "[Google] Transfer Drive": {
+    "statusCode": 200,
+    "body": {
+     "overallTransferStatusCode": "inProgress"
+    }
+   },
+   "[M365] Delete User": {
+    "statusCode": 204,
+    "body": ""
+   }
+  },
+  "has": {
+   "Code: Parse Tickets": [
+    {
+     "pairs": [
+      [
+       "Zrazkovyi",
+       "Oleh"
+      ],
+      [
+       "Oleh",
+       "Zrazkovyi"
+      ]
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "немає дати звільнення: коментар, нічого не робимо (старий флоу брав «сьогодні»)",
+  "stubs": {
+   "[Redmine] Get Open Leaver Tickets": [
+    {
+     "issues": [
+      {
+       "id": 308,
+       "tracker": {
+        "id": 25,
+        "name": "Admin | Leaver"
+       },
+       "status": {
+        "id": 1,
+        "name": "New"
+       },
+       "subject": "Admin Leaver - Ivan Testovenko",
+       "description": "Доброго дня!\r\nПрошу запустити процес припинення співпраці з Ivan Testovenko/Trainer/Lutsk\r\nПереадресація пошти: видалити\r\nПереадресація диску: recv.person@corp.example.com\r\n\r\nДякую.",
+       "custom_fields": [
+        {
+         "id": 11,
+         "name": "Contractor (ENG)",
+         "value": "Ivan Testovenko"
+        },
+        {
+         "id": 103,
+         "name": "Contractor (UKR)",
+         "value": "Тестовенко Іван"
+        },
+        {
+         "id": 25,
+         "name": "Manager",
+         "value": "Mariia Probna"
+        }
+       ]
+      }
+     ],
+     "total_count": 1
+    }
+   ],
+   "[Google] Suspend User": {
+    "statusCode": 200,
+    "body": {
+     "suspended": true
+    }
+   },
+   "[Google] Transfer Drive": {
+    "statusCode": 200,
+    "body": {
+     "overallTransferStatusCode": "inProgress"
+    }
+   },
+   "[M365] Delete User": {
+    "statusCode": 204,
+    "body": ""
+   },
+   "[M365] Search User": {
+    "statusCode": 200,
+    "body": {
+     "value": []
+    }
+   },
+   "[Google] Find User": {
+    "statusCode": 200,
+    "body": {
+     "kind": "admin#directory#users"
+    }
+   },
+   "[Redmine] Get Ticket History": {
+    "issue": {
+     "status": {
+      "id": 1
+     },
+     "journals": []
+    }
+   }
+  },
+  "counts": {
+   "[Redmine] Comment Missing Data": 1,
+   "[AD] Search User": 0
+  },
+  "has": {
+   "[Redmine] Comment Missing Data": [
+    {
+     "id": 308,
+     "note": "~не вказано дату звільнення"
+    }
+   ]
+  }
+ },
+ {
+  "name": "дата завтра: нічого",
+  "stubs": {
+   "[Redmine] Get Open Leaver Tickets": [
+    {
+     "issues": [
+      {
+       "id": 309,
+       "tracker": {
+        "id": 25,
+        "name": "Admin | Leaver"
+       },
+       "status": {
+        "id": 1,
+        "name": "New"
+       },
+       "subject": "Admin Leaver - Ivan Testovenko",
+       "description": "Доброго дня!\r\nПрошу запустити процес припинення співпраці з Ivan Testovenko/Trainer/Lutsk\r\nПереадресація пошти: видалити\r\nПереадресація диску: recv.person@corp.example.com\r\n\r\nДякую.",
+       "custom_fields": [
+        {
+         "id": 11,
+         "name": "Contractor (ENG)",
+         "value": "Ivan Testovenko"
+        },
+        {
+         "id": 103,
+         "name": "Contractor (UKR)",
+         "value": "Тестовенко Іван"
+        },
+        {
+         "id": 25,
+         "name": "Manager",
+         "value": "Mariia Probna"
+        },
+        {
+         "id": 30,
+         "name": "Termination date",
+         "value": "$TOMORROW"
+        }
+       ]
+      }
+     ],
+     "total_count": 1
+    }
+   ],
+   "[Google] Suspend User": {
+    "statusCode": 200,
+    "body": {
+     "suspended": true
+    }
+   },
+   "[Google] Transfer Drive": {
+    "statusCode": 200,
+    "body": {
+     "overallTransferStatusCode": "inProgress"
+    }
+   },
+   "[M365] Delete User": {
+    "statusCode": 204,
+    "body": ""
+   },
+   "[M365] Search User": {
+    "statusCode": 200,
+    "body": {
+     "value": []
+    }
+   },
+   "[Google] Find User": {
+    "statusCode": 200,
+    "body": {
+     "kind": "admin#directory#users"
+    }
+   },
+   "[Redmine] Get Ticket History": {
+    "issue": {
+     "status": {
+      "id": 1
+     },
+     "journals": []
+    }
+   }
+  },
+  "counts": {
+   "[Redmine] Comment Missing Data": 0,
+   "[AD] Search User": 0
+  }
+ },
+ {
+  "name": "диск: лише ім'я -> пропонуємо людину, не передаємо",
+  "stubs": {
+   "[Redmine] Get Open Leaver Tickets": [
+    {
+     "issues": [
+      {
+       "id": 310,
+       "tracker": {
+        "id": 25,
+        "name": "Admin | Leaver"
+       },
+       "status": {
+        "id": 1,
+        "name": "New"
+       },
+       "subject": "Admin Leaver - Ivan Testovenko",
+       "description": "Доброго дня!\r\nПрошу запустити процес припинення співпраці з Ivan Testovenko\r\nДані пошти та диску передати - Тестова Жанна\r\n\r\nДякую.",
+       "custom_fields": [
+        {
+         "id": 11,
+         "name": "Contractor (ENG)",
+         "value": "Ivan Testovenko"
+        },
+        {
+         "id": 103,
+         "name": "Contractor (UKR)",
+         "value": "Тестовенко Іван"
+        },
+        {
+         "id": 25,
+         "name": "Manager",
+         "value": "Mariia Probna"
+        },
+        {
+         "id": 30,
+         "name": "Termination date",
+         "value": "$YESTERDAY"
+        }
+       ]
+      }
+     ],
+     "total_count": 1
+    }
+   ],
+   "[Redmine] Get Ticket History": {
+    "__by_ticket": {
+     "310": {
+      "issue": {
+       "status": {
+        "id": 1
+       },
+       "journals": [
+        {
+         "id": 0,
+         "notes": "Заборгованості по техніці немає",
+         "user": {
+          "name": "IT"
+         }
+        }
+       ]
+      }
+     }
+    }
+   },
+   "[AD] Search User": {
+    "__by_ticket": {
+     "310": [
+      {
+       "dn": "CN=Ivan Testovenko,OU=administrative_staff,OU=AllUsers,OU=COMPANY,DC=example,DC=com",
+       "sAMAccountName": "ivan.testovenko",
+       "givenName": "Ivan",
+       "sn": "Testovenko",
+       "userAccountControl": "512"
+      }
+     ]
+    }
+   },
+   "[Google] Find User": {
+    "__by_ticket": {
+     "310": {
+      "statusCode": 200,
+      "body": {
+       "users": [
+        {
+         "id": "g-ivan.testovenko",
+         "primaryEmail": "ivan.testovenko@corp.example.com",
+         "name": {
+          "fullName": "Ivan Testovenko"
+         },
+         "suspended": false
+        }
+       ]
+      }
+     }
+    }
+   },
+   "[Google] Find Drive Recipient": {
+    "__by_ticket": {
+     "310": {
+      "statusCode": 200,
+      "body": {
+       "users": [
+        {
+         "id": "g-zhanna.testova",
+         "primaryEmail": "zhanna.testova@corp.example.com",
+         "name": {
+          "fullName": "Zhanna Testova"
+         },
+         "suspended": false
+        }
+       ]
+      }
+     }
+    }
+   },
+   "[M365] Search User": {
+    "__by_ticket": {
+     "310": {
+      "statusCode": 200,
+      "body": {
+       "value": [
+        {
+         "id": "m-ivan.testovenko",
+         "userPrincipalName": "ivan.testovenko@m365.example.com",
+         "userType": "Member"
+        }
+       ]
+      }
+     }
+    }
+   },
+   "[Google] Suspend User": {
+    "statusCode": 200,
+    "body": {
+     "suspended": true
+    }
+   },
+   "[Google] Transfer Drive": {
+    "statusCode": 200,
+    "body": {
+     "overallTransferStatusCode": "inProgress"
+    }
+   },
+   "[M365] Delete User": {
+    "statusCode": 204,
+    "body": ""
+   }
+  },
+  "counts": {
+   "[Google] Transfer Drive": 0,
+   "Code: Prepare Drive Transfer": 2
+  },
+  "has": {
+   "Code: Build Report": [
+    {
+     "close": false,
+     "note": "~Передати диск: Zhanna Testova (zhanna.testova@corp.example.com)?"
+    }
+   ]
+  }
+ },
+ {
+  "name": "диск: на питання відповіли «так» -> передаємо і закриваємо",
+  "stubs": {
+   "[Redmine] Get Open Leaver Tickets": [
+    {
+     "issues": [
+      {
+       "id": 311,
+       "tracker": {
+        "id": 25,
+        "name": "Admin | Leaver"
+       },
+       "status": {
+        "id": 1,
+        "name": "New"
+       },
+       "subject": "Admin Leaver - Ivan Testovenko",
+       "description": "Доброго дня!\r\nДані пошти та диску передати - Тестова Жанна\r\n",
+       "custom_fields": [
+        {
+         "id": 11,
+         "name": "Contractor (ENG)",
+         "value": "Ivan Testovenko"
+        },
+        {
+         "id": 103,
+         "name": "Contractor (UKR)",
+         "value": "Тестовенко Іван"
+        },
+        {
+         "id": 25,
+         "name": "Manager",
+         "value": "Mariia Probna"
+        },
+        {
+         "id": 30,
+         "name": "Termination date",
+         "value": "$YESTERDAY"
+        }
+       ]
+      }
+     ],
+     "total_count": 1
+    }
+   ],
+   "[Redmine] Get Ticket History": {
+    "__by_ticket": {
+     "311": {
+      "issue": {
+       "status": {
+        "id": 1
+       },
+       "journals": [
+        {
+         "id": 0,
+         "notes": "⚠ Автоматичний offboarding ... \n• Передати диск: Zhanna Testova (zhanna.testova@corp.example.com)?\n",
+         "user": {
+          "name": "Automation Bot"
+         }
+        },
+        {
+         "id": 1,
+         "notes": "так",
+         "user": {
+          "name": "IT"
+         }
+        },
+        {
+         "id": 2,
+         "notes": "Заборгованості по техніці немає",
+         "user": {
+          "name": "IT"
+         }
+        }
+       ]
+      }
+     }
+    }
+   },
+   "[AD] Search User": {
+    "__by_ticket": {
+     "311": [
+      {
+       "dn": "CN=Ivan Testovenko,OU=administrative_staff,OU=AllUsers,OU=COMPANY,DC=example,DC=com",
+       "sAMAccountName": "ivan.testovenko",
+       "givenName": "Ivan",
+       "sn": "Testovenko",
+       "userAccountControl": "512"
+      }
+     ]
+    }
+   },
+   "[Google] Find User": {
+    "__by_ticket": {
+     "311": {
+      "statusCode": 200,
+      "body": {
+       "users": [
+        {
+         "id": "g-ivan.testovenko",
+         "primaryEmail": "ivan.testovenko@corp.example.com",
+         "name": {
+          "fullName": "Ivan Testovenko"
+         },
+         "suspended": false
+        }
+       ]
+      }
+     }
+    }
+   },
+   "[Google] Find Drive Recipient": {
+    "__by_ticket": {
+     "311": {
+      "statusCode": 200,
+      "body": {
+       "id": "g-zhanna.testova",
+       "primaryEmail": "zhanna.testova@corp.example.com",
+       "name": {
+        "fullName": "Zhanna Testova"
+       },
+       "suspended": false
+      }
+     }
+    }
+   },
+   "[M365] Search User": {
+    "__by_ticket": {
+     "311": {
+      "statusCode": 200,
+      "body": {
+       "value": [
+        {
+         "id": "m-ivan.testovenko",
+         "userPrincipalName": "ivan.testovenko@m365.example.com",
+         "userType": "Member"
+        }
+       ]
+      }
+     }
+    }
+   },
+   "[Google] Suspend User": {
+    "statusCode": 200,
+    "body": {
+     "suspended": true
+    }
+   },
+   "[Google] Transfer Drive": {
+    "statusCode": 200,
+    "body": {
+     "overallTransferStatusCode": "inProgress"
+    }
+   },
+   "[M365] Delete User": {
+    "statusCode": 204,
+    "body": ""
+   }
+  },
+  "counts": {
+   "[Google] Transfer Drive": 1,
+   "Code: Prepare Drive Transfer": 1
+  },
+  "has": {
+   "Code: Prepare Drive Transfer": [
+    {
+     "confirmed_email": "zhanna.testova@corp.example.com"
+    }
+   ],
+   "Code: Build Report": [
+    {
+     "close": true,
+     "note": "~кому: Zhanna Testova"
+    }
+   ]
+  }
+ },
+ {
+  "name": "диск: «не потрібно» -> без пошуку отримувача",
+  "stubs": {
+   "[Redmine] Get Open Leaver Tickets": [
+    {
+     "issues": [
+      {
+       "id": 312,
+       "tracker": {
+        "id": 25,
+        "name": "Admin | Leaver"
+       },
+       "status": {
+        "id": 1,
+        "name": "New"
+       },
+       "subject": "Admin Leaver - Ivan Testovenko",
+       "description": "Переадресація пошти: не потрібно\r\nПереадресація диску: не потрібно\r\n",
+       "custom_fields": [
+        {
+         "id": 11,
+         "name": "Contractor (ENG)",
+         "value": "Ivan Testovenko"
+        },
+        {
+         "id": 103,
+         "name": "Contractor (UKR)",
+         "value": "Тестовенко Іван"
+        },
+        {
+         "id": 25,
+         "name": "Manager",
+         "value": "Mariia Probna"
+        },
+        {
+         "id": 30,
+         "name": "Termination date",
+         "value": "$YESTERDAY"
+        }
+       ]
+      }
+     ],
+     "total_count": 1
+    }
+   ],
+   "[Redmine] Get Ticket History": {
+    "__by_ticket": {
+     "312": {
+      "issue": {
+       "status": {
+        "id": 1
+       },
+       "journals": [
+        {
+         "id": 0,
+         "notes": "Заборгованості по техніці немає",
+         "user": {
+          "name": "IT"
+         }
+        }
+       ]
+      }
+     }
+    }
+   },
+   "[AD] Search User": {
+    "__by_ticket": {
+     "312": [
+      {
+       "dn": "CN=Ivan Testovenko,OU=administrative_staff,OU=AllUsers,OU=COMPANY,DC=example,DC=com",
+       "sAMAccountName": "ivan.testovenko",
+       "givenName": "Ivan",
+       "sn": "Testovenko",
+       "userAccountControl": "512"
+      }
+     ]
+    }
+   },
+   "[Google] Find User": {
+    "__by_ticket": {
+     "312": {
+      "statusCode": 200,
+      "body": {
+       "users": [
+        {
+         "id": "g-ivan.testovenko",
+         "primaryEmail": "ivan.testovenko@corp.example.com",
+         "name": {
+          "fullName": "Ivan Testovenko"
+         },
+         "suspended": false
+        }
+       ]
+      }
+     }
+    }
+   },
+   "[Google] Find Drive Recipient": {
+    "__by_ticket": {
+     "312": {
+      "statusCode": 200,
+      "body": {
+       "id": "g-recv.person",
+       "primaryEmail": "recv.person@corp.example.com",
+       "name": {
+        "fullName": "Recv Person"
+       },
+       "suspended": false
+      }
+     }
+    }
+   },
+   "[M365] Search User": {
+    "__by_ticket": {
+     "312": {
+      "statusCode": 200,
+      "body": {
+       "value": [
+        {
+         "id": "m-ivan.testovenko",
+         "userPrincipalName": "ivan.testovenko@m365.example.com",
+         "userType": "Member"
+        }
+       ]
+      }
+     }
+    }
+   },
+   "[Google] Suspend User": {
+    "statusCode": 200,
+    "body": {
+     "suspended": true
+    }
+   },
+   "[Google] Transfer Drive": {
+    "statusCode": 200,
+    "body": {
+     "overallTransferStatusCode": "inProgress"
+    }
+   },
+   "[M365] Delete User": {
+    "statusCode": 204,
+    "body": ""
+   }
+  },
+  "counts": {
+   "[Google] Find Drive Recipient": 0,
+   "[Google] Transfer Drive": 0
+  },
+  "has": {
+   "Code: Build Report": [
+    {
+     "close": true,
+     "note": "~передавати не потрібно"
+    }
+   ]
+  }
+ },
+ {
+  "name": "диск: нічого не сказано -> пропонуємо менеджера з поля Manager",
+  "stubs": {
+   "[Redmine] Get Open Leaver Tickets": [
+    {
+     "issues": [
+      {
+       "id": 313,
+       "tracker": {
+        "id": 25,
+        "name": "Admin | Leaver"
+       },
+       "status": {
+        "id": 1,
+        "name": "New"
+       },
+       "subject": "Admin Leaver - Ivan Testovenko",
+       "description": "Прошу запустити процес припинення співпраці з Ivan Testovenko\r\n",
+       "custom_fields": [
+        {
+         "id": 11,
+         "name": "Contractor (ENG)",
+         "value": "Ivan Testovenko"
+        },
+        {
+         "id": 103,
+         "name": "Contractor (UKR)",
+         "value": "Тестовенко Іван"
+        },
+        {
+         "id": 25,
+         "name": "Manager",
+         "value": "Mariia Probna"
+        },
+        {
+         "id": 30,
+         "name": "Termination date",
+         "value": "$YESTERDAY"
+        }
+       ]
+      }
+     ],
+     "total_count": 1
+    }
+   ],
+   "[Redmine] Get Ticket History": {
+    "__by_ticket": {
+     "313": {
+      "issue": {
+       "status": {
+        "id": 1
+       },
+       "journals": [
+        {
+         "id": 0,
+         "notes": "Заборгованості по техніці немає",
+         "user": {
+          "name": "IT"
+         }
+        }
+       ]
+      }
+     }
+    }
+   },
+   "[AD] Search User": {
+    "__by_ticket": {
+     "313": [
+      {
+       "dn": "CN=Ivan Testovenko,OU=administrative_staff,OU=AllUsers,OU=COMPANY,DC=example,DC=com",
+       "sAMAccountName": "ivan.testovenko",
+       "givenName": "Ivan",
+       "sn": "Testovenko",
+       "userAccountControl": "512"
+      }
+     ]
+    }
+   },
+   "[Google] Find User": {
+    "__by_ticket": {
+     "313": {
+      "statusCode": 200,
+      "body": {
+       "users": [
+        {
+         "id": "g-ivan.testovenko",
+         "primaryEmail": "ivan.testovenko@corp.example.com",
+         "name": {
+          "fullName": "Ivan Testovenko"
+         },
+         "suspended": false
+        }
+       ]
+      }
+     }
+    }
+   },
+   "[Google] Find Drive Recipient": {
+    "__by_ticket": {
+     "313": {
+      "statusCode": 200,
+      "body": {
+       "users": [
+        {
+         "id": "g-mariia.probna",
+         "primaryEmail": "mariia.probna@corp.example.com",
+         "name": {
+          "fullName": "Mariia Probna"
+         },
+         "suspended": false
+        }
+       ]
+      }
+     }
+    }
+   },
+   "[M365] Search User": {
+    "__by_ticket": {
+     "313": {
+      "statusCode": 200,
+      "body": {
+       "value": [
+        {
+         "id": "m-ivan.testovenko",
+         "userPrincipalName": "ivan.testovenko@m365.example.com",
+         "userType": "Member"
+        }
+       ]
+      }
+     }
+    }
+   },
+   "[Google] Suspend User": {
+    "statusCode": 200,
+    "body": {
+     "suspended": true
+    }
+   },
+   "[Google] Transfer Drive": {
+    "statusCode": 200,
+    "body": {
+     "overallTransferStatusCode": "inProgress"
+    }
+   },
+   "[M365] Delete User": {
+    "statusCode": 204,
+    "body": ""
+   }
+  },
+  "has": {
+   "Code: Parse Tickets": [
+    {
+     "drive": {
+      "mode": "manager",
+      "name": "Mariia Probna",
+      "pairs": [
+       [
+        "Mariia",
+        "Probna"
+       ],
+       [
+        "Probna",
+        "Mariia"
+       ]
+      ],
+      "text": "не вказано, менеджер: Mariia Probna"
+     }
+    }
+   ],
+   "Code: Build Report": [
+    {
+     "note": "~Передати диск: Mariia Probna (mariia.probna@corp.example.com)?"
+    }
+   ]
+  }
+ },
+ {
+  "name": "диск: нічого не сказано і менеджера немає -> просимо e-mail",
+  "stubs": {
+   "[Redmine] Get Open Leaver Tickets": [
+    {
+     "issues": [
+      {
+       "id": 314,
+       "tracker": {
+        "id": 25,
+        "name": "Admin | Leaver"
+       },
+       "status": {
+        "id": 1,
+        "name": "New"
+       },
+       "subject": "Admin Leaver - Ivan Testovenko",
+       "description": "Прошу запустити процес.\r\n",
+       "custom_fields": [
+        {
+         "id": 11,
+         "name": "Contractor (ENG)",
+         "value": "Ivan Testovenko"
+        },
+        {
+         "id": 103,
+         "name": "Contractor (UKR)",
+         "value": "Тестовенко Іван"
+        },
+        {
+         "id": 25,
+         "name": "Manager",
+         "value": "-"
+        },
+        {
+         "id": 30,
+         "name": "Termination date",
+         "value": "$YESTERDAY"
+        }
+       ]
+      }
+     ],
+     "total_count": 1
+    }
+   ],
+   "[Redmine] Get Ticket History": {
+    "__by_ticket": {
+     "314": {
+      "issue": {
+       "status": {
+        "id": 1
+       },
+       "journals": [
+        {
+         "id": 0,
+         "notes": "Заборгованості по техніці немає",
+         "user": {
+          "name": "IT"
+         }
+        }
+       ]
+      }
+     }
+    }
+   },
+   "[AD] Search User": {
+    "__by_ticket": {
+     "314": [
+      {
+       "dn": "CN=Ivan Testovenko,OU=administrative_staff,OU=AllUsers,OU=COMPANY,DC=example,DC=com",
+       "sAMAccountName": "ivan.testovenko",
+       "givenName": "Ivan",
+       "sn": "Testovenko",
+       "userAccountControl": "512"
+      }
+     ]
+    }
+   },
+   "[Google] Find User": {
+    "__by_ticket": {
+     "314": {
+      "statusCode": 200,
+      "body": {
+       "users": [
+        {
+         "id": "g-ivan.testovenko",
+         "primaryEmail": "ivan.testovenko@corp.example.com",
+         "name": {
+          "fullName": "Ivan Testovenko"
+         },
+         "suspended": false
+        }
+       ]
+      }
+     }
+    }
+   },
+   "[Google] Find Drive Recipient": {
+    "__by_ticket": {
+     "314": {
+      "statusCode": 200,
+      "body": {
+       "id": "g-recv.person",
+       "primaryEmail": "recv.person@corp.example.com",
+       "name": {
+        "fullName": "Recv Person"
+       },
+       "suspended": false
+      }
+     }
+    }
+   },
+   "[M365] Search User": {
+    "__by_ticket": {
+     "314": {
+      "statusCode": 200,
+      "body": {
+       "value": [
+        {
+         "id": "m-ivan.testovenko",
+         "userPrincipalName": "ivan.testovenko@m365.example.com",
+         "userType": "Member"
+        }
+       ]
+      }
+     }
+    }
+   },
+   "[Google] Suspend User": {
+    "statusCode": 200,
+    "body": {
+     "suspended": true
+    }
+   },
+   "[Google] Transfer Drive": {
+    "statusCode": 200,
+    "body": {
+     "overallTransferStatusCode": "inProgress"
+    }
+   },
+   "[M365] Delete User": {
+    "statusCode": 204,
+    "body": ""
+   }
+  },
+  "counts": {
+   "[Google] Find Drive Recipient": 0
+  },
+  "has": {
+   "Code: Build Report": [
+    {
+     "close": false,
+     "note": "~не зрозуміло, кому передати"
+    }
+   ]
+  }
+ },
+ {
+  "name": "AD: два акаунти -> не блокуємо, решта систем працює",
+  "stubs": {
+   "[Redmine] Get Open Leaver Tickets": [
+    {
+     "issues": [
+      {
+       "id": 315,
+       "tracker": {
+        "id": 25,
+        "name": "Admin | Leaver"
+       },
+       "status": {
+        "id": 1,
+        "name": "New"
+       },
+       "subject": "Admin Leaver - Ivan Testovenko",
+       "description": "Доброго дня!\r\nПрошу запустити процес припинення співпраці з Ivan Testovenko/Trainer/Lutsk\r\nПереадресація пошти: видалити\r\nПереадресація диску: recv.person@corp.example.com\r\n\r\nДякую.",
+       "custom_fields": [
+        {
+         "id": 11,
+         "name": "Contractor (ENG)",
+         "value": "Ivan Testovenko"
+        },
+        {
+         "id": 103,
+         "name": "Contractor (UKR)",
+         "value": "Тестовенко Іван"
+        },
+        {
+         "id": 25,
+         "name": "Manager",
+         "value": "Mariia Probna"
+        },
+        {
+         "id": 30,
+         "name": "Termination date",
+         "value": "$YESTERDAY"
+        }
+       ]
+      }
+     ],
+     "total_count": 1
+    }
+   ],
+   "[Redmine] Get Ticket History": {
+    "__by_ticket": {
+     "315": {
+      "issue": {
+       "status": {
+        "id": 1
+       },
+       "journals": [
+        {
+         "id": 0,
+         "notes": "Заборгованості по техніці немає",
+         "user": {
+          "name": "IT"
+         }
+        }
+       ]
+      }
+     }
+    }
+   },
+   "[AD] Search User": {
+    "__by_ticket": {
+     "315": [
+      {
+       "dn": "CN=Ivan Testovenko,OU=administrative_staff,OU=AllUsers,OU=COMPANY,DC=example,DC=com",
+       "sAMAccountName": "ivan.testovenko",
+       "givenName": "Ivan",
+       "sn": "Testovenko",
+       "userAccountControl": "512"
+      },
+      {
+       "dn": "CN=Ivan Testovenko,OU=administrative_staff,OU=AllUsers,OU=COMPANY,DC=example,DC=com",
+       "sAMAccountName": "i.testovenko",
+       "givenName": "Ivan",
+       "sn": "Testovenko",
+       "userAccountControl": "512"
+      }
+     ]
+    }
+   },
+   "[Google] Find User": {
+    "__by_ticket": {
+     "315": {
+      "statusCode": 200,
+      "body": {
+       "users": [
+        {
+         "id": "g-ivan.testovenko",
+         "primaryEmail": "ivan.testovenko@corp.example.com",
+         "name": {
+          "fullName": "Ivan Testovenko"
+         },
+         "suspended": false
+        }
+       ]
+      }
+     }
+    }
+   },
+   "[Google] Find Drive Recipient": {
+    "__by_ticket": {
+     "315": {
+      "statusCode": 200,
+      "body": {
+       "id": "g-recv.person",
+       "primaryEmail": "recv.person@corp.example.com",
+       "name": {
+        "fullName": "Recv Person"
+       },
+       "suspended": false
+      }
+     }
+    }
+   },
+   "[M365] Search User": {
+    "__by_ticket": {
+     "315": {
+      "statusCode": 200,
+      "body": {
+       "value": [
+        {
+         "id": "m-ivan.testovenko",
+         "userPrincipalName": "ivan.testovenko@m365.example.com",
+         "userType": "Member"
+        }
+       ]
+      }
+     }
+    }
+   },
+   "[Google] Suspend User": {
+    "statusCode": 200,
+    "body": {
+     "suspended": true
+    }
+   },
+   "[Google] Transfer Drive": {
+    "statusCode": 200,
+    "body": {
+     "overallTransferStatusCode": "inProgress"
+    }
+   },
+   "[M365] Delete User": {
+    "statusCode": 204,
+    "body": ""
+   }
+  },
+  "counts": {
+   "[AD] Disable Account": 0,
+   "[Google] Suspend User": 1,
+   "[M365] Delete User": 1
+  },
+  "has": {
+   "Code: Build Report": [
+    {
+     "close": false,
+     "note": "~Знайдено кілька акаунтів: ivan.testovenko (administrative_staff, активний); i.testovenko"
+    }
+   ]
+  }
+ },
+ {
+  "name": "AD: ім'я/прізвище порожні, знайдено за шаблоном ms.і.прізвище",
+  "stubs": {
+   "[Redmine] Get Open Leaver Tickets": [
+    {
+     "issues": [
+      {
+       "id": 328,
+       "tracker": {
+        "id": 25,
+        "name": "Admin | Leaver"
+       },
+       "status": {
+        "id": 1,
+        "name": "New"
+       },
+       "subject": "Admin Leaver - Ivan Testovenko",
+       "description": "Доброго дня!\r\nПрошу запустити процес припинення співпраці з Ivan Testovenko/Trainer/Lutsk\r\nПереадресація пошти: видалити\r\nПереадресація диску: recv.person@corp.example.com\r\n\r\nДякую.",
+       "custom_fields": [
+        {
+         "id": 11,
+         "name": "Contractor (ENG)",
+         "value": "Ivan Testovenko"
+        },
+        {
+         "id": 103,
+         "name": "Contractor (UKR)",
+         "value": "Тестовенко Іван"
+        },
+        {
+         "id": 25,
+         "name": "Manager",
+         "value": "Mariia Probna"
+        },
+        {
+         "id": 30,
+         "name": "Termination date",
+         "value": "$YESTERDAY"
+        }
+       ]
+      }
+     ],
+     "total_count": 1
+    }
+   ],
+   "[Redmine] Get Ticket History": {
+    "__by_ticket": {
+     "328": {
+      "issue": {
+       "status": {
+        "id": 1
+       },
+       "journals": [
+        {
+         "id": 0,
+         "notes": "Заборгованості по техніці немає",
+         "user": {
+          "name": "IT"
+         }
+        }
+       ]
+      }
+     }
+    }
+   },
+   "[AD] Search User": {
+    "__by_ticket": {
+     "328": [
+      {
+       "dn": "CN=ms.i.testovenko,OU=administrative_staff,OU=AllUsers,OU=COMPANY,DC=example,DC=com",
+       "sAMAccountName": "ms.i.testovenko",
+       "givenName": [],
+       "sn": [],
+       "userAccountControl": "512"
+      }
+     ]
+    }
+   },
+   "[Google] Find User": {
+    "__by_ticket": {
+     "328": {
+      "statusCode": 200,
+      "body": {
+       "users": [
+        {
+         "id": "g-ivan.testovenko",
+         "primaryEmail": "ivan.testovenko@corp.example.com",
+         "name": {
+          "fullName": "Ivan Testovenko"
+         },
+         "suspended": false
+        }
+       ]
+      }
+     }
+    }
+   },
+   "[Google] Find Drive Recipient": {
+    "__by_ticket": {
+     "328": {
+      "statusCode": 200,
+      "body": {
+       "id": "g-recv.person",
+       "primaryEmail": "recv.person@corp.example.com",
+       "name": {
+        "fullName": "Recv Person"
+       },
+       "suspended": false
+      }
+     }
+    }
+   },
+   "[M365] Search User": {
+    "__by_ticket": {
+     "328": {
+      "statusCode": 200,
+      "body": {
+       "value": [
+        {
+         "id": "m-ivan.testovenko",
+         "userPrincipalName": "ivan.testovenko@m365.example.com",
+         "userType": "Member"
+        }
+       ]
+      }
+     }
+    }
+   },
+   "[Google] Suspend User": {
+    "statusCode": 200,
+    "body": {
+     "suspended": true
+    }
+   },
+   "[Google] Transfer Drive": {
+    "statusCode": 200,
+    "body": {
+     "overallTransferStatusCode": "inProgress"
+    }
+   },
+   "[M365] Delete User": {
+    "statusCode": 204,
+    "body": ""
+   }
+  },
+  "counts": {
+   "[AD] Disable Account": 1
+  },
+  "has": {
+   "Code: Build Report": [
+    {
+     "note": "~ms.i.testovenko заблоковано та переміщено в OU «Уволенные». (ім’я/прізвище в AD не заповнені, знайдено за шаблоном логіна)"
+    }
+   ]
+  }
+ },
+ {
+  "name": "AD: є і збіг за ім'ям, і інший за шаблоном логіна -> беремо збіг за ім'ям",
+  "stubs": {
+   "[Redmine] Get Open Leaver Tickets": [
+    {
+     "issues": [
+      {
+       "id": 329,
+       "tracker": {
+        "id": 25,
+        "name": "Admin | Leaver"
+       },
+       "status": {
+        "id": 1,
+        "name": "New"
+       },
+       "subject": "Admin Leaver - Ivan Testovenko",
+       "description": "Доброго дня!\r\nПрошу запустити процес припинення співпраці з Ivan Testovenko/Trainer/Lutsk\r\nПереадресація пошти: видалити\r\nПереадресація диску: recv.person@corp.example.com\r\n\r\nДякую.",
+       "custom_fields": [
+        {
+         "id": 11,
+         "name": "Contractor (ENG)",
+         "value": "Ivan Testovenko"
+        },
+        {
+         "id": 103,
+         "name": "Contractor (UKR)",
+         "value": "Тестовенко Іван"
+        },
+        {
+         "id": 25,
+         "name": "Manager",
+         "value": "Mariia Probna"
+        },
+        {
+         "id": 30,
+         "name": "Termination date",
+         "value": "$YESTERDAY"
+        }
+       ]
+      }
+     ],
+     "total_count": 1
+    }
+   ],
+   "[Redmine] Get Ticket History": {
+    "__by_ticket": {
+     "329": {
+      "issue": {
+       "status": {
+        "id": 1
+       },
+       "journals": [
+        {
+         "id": 0,
+         "notes": "Заборгованості по техніці немає",
+         "user": {
+          "name": "IT"
+         }
+        }
+       ]
+      }
+     }
+    }
+   },
+   "[AD] Search User": {
+    "__by_ticket": {
+     "329": [
+      {
+       "dn": "CN=Ivan Testovenko,OU=administrative_staff,OU=AllUsers,OU=COMPANY,DC=example,DC=com",
+       "sAMAccountName": "ivan.testovenko",
+       "givenName": "Ivan",
+       "sn": "Testovenko",
+       "userAccountControl": "512"
+      },
+      {
+       "dn": "CN=old,OU=administrative_staff,OU=AllUsers,OU=COMPANY,DC=example,DC=com",
+       "sAMAccountName": "i.testovenko",
+       "givenName": [],
+       "sn": [],
+       "userAccountControl": "512"
+      }
+     ]
+    }
+   },
+   "[Google] Find User": {
+    "__by_ticket": {
+     "329": {
+      "statusCode": 200,
+      "body": {
+       "users": [
+        {
+         "id": "g-ivan.testovenko",
+         "primaryEmail": "ivan.testovenko@corp.example.com",
+         "name": {
+          "fullName": "Ivan Testovenko"
+         },
+         "suspended": false
+        }
+       ]
+      }
+     }
+    }
+   },
+   "[Google] Find Drive Recipient": {
+    "__by_ticket": {
+     "329": {
+      "statusCode": 200,
+      "body": {
+       "id": "g-recv.person",
+       "primaryEmail": "recv.person@corp.example.com",
+       "name": {
+        "fullName": "Recv Person"
+       },
+       "suspended": false
+      }
+     }
+    }
+   },
+   "[M365] Search User": {
+    "__by_ticket": {
+     "329": {
+      "statusCode": 200,
+      "body": {
+       "value": [
+        {
+         "id": "m-ivan.testovenko",
+         "userPrincipalName": "ivan.testovenko@m365.example.com",
+         "userType": "Member"
+        }
+       ]
+      }
+     }
+    }
+   },
+   "[Google] Suspend User": {
+    "statusCode": 200,
+    "body": {
+     "suspended": true
+    }
+   },
+   "[Google] Transfer Drive": {
+    "statusCode": 200,
+    "body": {
+     "overallTransferStatusCode": "inProgress"
+    }
+   },
+   "[M365] Delete User": {
+    "statusCode": 204,
+    "body": ""
+   }
+  },
+  "counts": {
+   "[AD] Disable Account": 1
+  },
+  "has": {
+   "Code: Decide AD Action": [
+    {
+     "ad": {
+      "status": "disable",
+      "dn": "CN=Ivan Testovenko,OU=administrative_staff,OU=AllUsers,OU=COMPANY,DC=example,DC=com",
+      "target_dn": "CN=Ivan Testovenko,OU=Уволенные,DC=example,DC=com",
+      "new_uac": "514",
+      "login": "ivan.testovenko",
+      "candidates": "ivan.testovenko (administrative_staff, активний)",
+      "by_login_pattern": false
+     }
+    }
+   ]
+  }
+ },
+ {
+  "name": "AD: не знайдено (уже видалено) -> не проблема, закриваємо",
+  "stubs": {
+   "[Redmine] Get Open Leaver Tickets": [
+    {
+     "issues": [
+      {
+       "id": 316,
+       "tracker": {
+        "id": 25,
+        "name": "Admin | Leaver"
+       },
+       "status": {
+        "id": 1,
+        "name": "New"
+       },
+       "subject": "Admin Leaver - Ivan Testovenko",
+       "description": "Доброго дня!\r\nПрошу запустити процес припинення співпраці з Ivan Testovenko/Trainer/Lutsk\r\nПереадресація пошти: видалити\r\nПереадресація диску: recv.person@corp.example.com\r\n\r\nДякую.",
+       "custom_fields": [
+        {
+         "id": 11,
+         "name": "Contractor (ENG)",
+         "value": "Ivan Testovenko"
+        },
+        {
+         "id": 103,
+         "name": "Contractor (UKR)",
+         "value": "Тестовенко Іван"
+        },
+        {
+         "id": 25,
+         "name": "Manager",
+         "value": "Mariia Probna"
+        },
+        {
+         "id": 30,
+         "name": "Termination date",
+         "value": "$YESTERDAY"
+        }
+       ]
+      }
+     ],
+     "total_count": 1
+    }
+   ],
+   "[Redmine] Get Ticket History": {
+    "__by_ticket": {
+     "316": {
+      "issue": {
+       "status": {
+        "id": 1
+       },
+       "journals": [
+        {
+         "id": 0,
+         "notes": "Заборгованості по техніці немає",
+         "user": {
+          "name": "IT"
+         }
+        }
+       ]
+      }
+     }
+    }
+   },
+   "[AD] Search User": {
+    "__by_ticket": {
+     "316": []
+    }
+   },
+   "[Google] Find User": {
+    "__by_ticket": {
+     "316": {
+      "statusCode": 200,
+      "body": {
+       "users": [
+        {
+         "id": "g-ivan.testovenko",
+         "primaryEmail": "ivan.testovenko@corp.example.com",
+         "name": {
+          "fullName": "Ivan Testovenko"
+         },
+         "suspended": false
+        }
+       ]
+      }
+     }
+    }
+   },
+   "[Google] Find Drive Recipient": {
+    "__by_ticket": {
+     "316": {
+      "statusCode": 200,
+      "body": {
+       "id": "g-recv.person",
+       "primaryEmail": "recv.person@corp.example.com",
+       "name": {
+        "fullName": "Recv Person"
+       },
+       "suspended": false
+      }
+     }
+    }
+   },
+   "[M365] Search User": {
+    "__by_ticket": {
+     "316": {
+      "statusCode": 200,
+      "body": {
+       "value": [
+        {
+         "id": "m-ivan.testovenko",
+         "userPrincipalName": "ivan.testovenko@m365.example.com",
+         "userType": "Member"
+        }
+       ]
+      }
+     }
+    }
+   },
+   "[Google] Suspend User": {
+    "statusCode": 200,
+    "body": {
+     "suspended": true
+    }
+   },
+   "[Google] Transfer Drive": {
+    "statusCode": 200,
+    "body": {
+     "overallTransferStatusCode": "inProgress"
+    }
+   },
+   "[M365] Delete User": {
+    "statusCode": 204,
+    "body": ""
+   }
+  },
+  "counts": {
+   "[AD] Disable Account": 0
+  },
+  "has": {
+   "Code: Build Report": [
+    {
+     "close": true,
+     "note": "~не знайдено (можливо, вже видалено)"
+    }
+   ]
+  }
+ },
+ {
+  "name": "Google: не знайдено -> проблема, диск не виконувався",
+  "stubs": {
+   "[Redmine] Get Open Leaver Tickets": [
+    {
+     "issues": [
+      {
+       "id": 317,
+       "tracker": {
+        "id": 25,
+        "name": "Admin | Leaver"
+       },
+       "status": {
+        "id": 1,
+        "name": "New"
+       },
+       "subject": "Admin Leaver - Ivan Testovenko",
+       "description": "Доброго дня!\r\nПрошу запустити процес припинення співпраці з Ivan Testovenko/Trainer/Lutsk\r\nПереадресація пошти: видалити\r\nПереадресація диску: recv.person@corp.example.com\r\n\r\nДякую.",
+       "custom_fields": [
+        {
+         "id": 11,
+         "name": "Contractor (ENG)",
+         "value": "Ivan Testovenko"
+        },
+        {
+         "id": 103,
+         "name": "Contractor (UKR)",
+         "value": "Тестовенко Іван"
+        },
+        {
+         "id": 25,
+         "name": "Manager",
+         "value": "Mariia Probna"
+        },
+        {
+         "id": 30,
+         "name": "Termination date",
+         "value": "$YESTERDAY"
+        }
+       ]
+      }
+     ],
+     "total_count": 1
+    }
+   ],
+   "[Redmine] Get Ticket History": {
+    "__by_ticket": {
+     "317": {
+      "issue": {
+       "status": {
+        "id": 1
+       },
+       "journals": [
+        {
+         "id": 0,
+         "notes": "Заборгованості по техніці немає",
+         "user": {
+          "name": "IT"
+         }
+        }
+       ]
+      }
+     }
+    }
+   },
+   "[AD] Search User": {
+    "__by_ticket": {
+     "317": [
+      {
+       "dn": "CN=Ivan Testovenko,OU=administrative_staff,OU=AllUsers,OU=COMPANY,DC=example,DC=com",
+       "sAMAccountName": "ivan.testovenko",
+       "givenName": "Ivan",
+       "sn": "Testovenko",
+       "userAccountControl": "512"
+      }
+     ]
+    }
+   },
+   "[Google] Find User": {
+    "__by_ticket": {
+     "317": {
+      "statusCode": 200,
+      "body": {
+       "kind": "admin#directory#users"
+      }
+     }
+    }
+   },
+   "[Google] Find Drive Recipient": {
+    "__by_ticket": {
+     "317": {
+      "statusCode": 200,
+      "body": {
+       "id": "g-recv.person",
+       "primaryEmail": "recv.person@corp.example.com",
+       "name": {
+        "fullName": "Recv Person"
+       },
+       "suspended": false
+      }
+     }
+    }
+   },
+   "[M365] Search User": {
+    "__by_ticket": {
+     "317": {
+      "statusCode": 200,
+      "body": {
+       "value": [
+        {
+         "id": "m-ivan.testovenko",
+         "userPrincipalName": "ivan.testovenko@m365.example.com",
+         "userType": "Member"
+        }
+       ]
+      }
+     }
+    }
+   },
+   "[Google] Suspend User": {
+    "statusCode": 200,
+    "body": {
+     "suspended": true
+    }
+   },
+   "[Google] Transfer Drive": {
+    "statusCode": 200,
+    "body": {
+     "overallTransferStatusCode": "inProgress"
+    }
+   },
+   "[M365] Delete User": {
+    "statusCode": 204,
+    "body": ""
+   }
+  },
+  "counts": {
+   "[Google] Suspend User": 0,
+   "[Google] Transfer Drive": 0
+  },
+  "has": {
+   "Code: Build Report": [
+    {
+     "close": false,
+     "note": "~Google Workspace: Акаунт за ім'ям «Ivan Testovenko» не знайдено"
+    },
+    {
+     "note": "~акаунт Google працівника не знайдено"
+    }
+   ]
+  }
+ },
+ {
+  "name": "повторний запуск: усе вже закрито, техніка ок -> короткий коментар і закриття",
+  "stubs": {
+   "[Redmine] Get Open Leaver Tickets": [
+    {
+     "issues": [
+      {
+       "id": 318,
+       "tracker": {
+        "id": 25,
+        "name": "Admin | Leaver"
+       },
+       "status": {
+        "id": 1,
+        "name": "New"
+       },
+       "subject": "Admin Leaver - Ivan Testovenko",
+       "description": "Доброго дня!\r\nПрошу запустити процес припинення співпраці з Ivan Testovenko/Trainer/Lutsk\r\nПереадресація пошти: видалити\r\nПереадресація диску: recv.person@corp.example.com\r\n\r\nДякую.",
+       "custom_fields": [
+        {
+         "id": 11,
+         "name": "Contractor (ENG)",
+         "value": "Ivan Testovenko"
+        },
+        {
+         "id": 103,
+         "name": "Contractor (UKR)",
+         "value": "Тестовенко Іван"
+        },
+        {
+         "id": 25,
+         "name": "Manager",
+         "value": "Mariia Probna"
+        },
+        {
+         "id": 30,
+         "name": "Termination date",
+         "value": "$YESTERDAY"
+        }
+       ]
+      }
+     ],
+     "total_count": 1
+    }
+   ],
+   "[Redmine] Get Ticket History": {
+    "__by_ticket": {
+     "318": {
+      "issue": {
+       "status": {
+        "id": 1
+       },
+       "journals": [
+        {
+         "id": 0,
+         "notes": "Автоматичний Offboarding успішно завершено!\n\nДетальний звіт про закриття доступів:\n1. Active Directory: ...\n3. Google Диск (Перенесення документів):\n   • Новий власник (керівник): x@corp.example.com\n   • Статус: Успішно ініційовано системою.\nЗаборгованості по техніці немає.",
+         "user": {
+          "name": "Automation Bot"
+         }
+        },
+        {
+         "id": 1,
+         "notes": "Заборгованості по техніці немає",
+         "user": {
+          "name": "IT"
+         }
+        }
+       ]
+      }
+     }
+    }
+   },
+   "[AD] Search User": {
+    "__by_ticket": {
+     "318": [
+      {
+       "dn": "CN=Ivan Testovenko,OU=Уволенные,DC=example,DC=com",
+       "sAMAccountName": "ivan.testovenko",
+       "givenName": "Ivan",
+       "sn": "Testovenko",
+       "userAccountControl": "514"
+      }
+     ]
+    }
+   },
+   "[Google] Find User": {
+    "__by_ticket": {
+     "318": {
+      "statusCode": 200,
+      "body": {
+       "users": [
+        {
+         "id": "g-ivan.testovenko",
+         "primaryEmail": "ivan.testovenko@corp.example.com",
+         "name": {
+          "fullName": "Ivan Testovenko"
+         },
+         "suspended": true
+        }
+       ]
+      }
+     }
+    }
+   },
+   "[Google] Find Drive Recipient": {
+    "__by_ticket": {
+     "318": {
+      "statusCode": 200,
+      "body": {
+       "id": "g-recv.person",
+       "primaryEmail": "recv.person@corp.example.com",
+       "name": {
+        "fullName": "Recv Person"
+       },
+       "suspended": false
+      }
+     }
+    }
+   },
+   "[M365] Search User": {
+    "__by_ticket": {
+     "318": {
+      "statusCode": 200,
+      "body": {
+       "value": []
+      }
+     }
+    }
+   },
+   "[Google] Suspend User": {
+    "statusCode": 200,
+    "body": {
+     "suspended": true
+    }
+   },
+   "[Google] Transfer Drive": {
+    "statusCode": 200,
+    "body": {
+     "overallTransferStatusCode": "inProgress"
+    }
+   },
+   "[M365] Delete User": {
+    "statusCode": 204,
+    "body": ""
+   }
+  },
+  "counts": {
+   "[AD] Disable Account": 0,
+   "[Google] Suspend User": 0,
+   "[M365] Delete User": 0,
+   "[Redmine] Update Ticket": 1,
+   "[Sheets] Add to Archive": 0
+  },
+  "has": {
+   "Code: Build Report": [
+    {
+     "close": true,
+     "note": "~доступи закрито раніше (див. попередній звіт). IT підтвердив"
+    }
+   ]
+  }
+ },
+ {
+  "name": "повторний запуск з ноутбуком: короткий коментар один раз, наступного дня мовчимо",
+  "steps": [
+   {
+    "stubs": {
+     "[Redmine] Get Open Leaver Tickets": [
+      {
+       "issues": [
+        {
+         "id": 319,
+         "tracker": {
+          "id": 25,
+          "name": "Admin | Leaver"
+         },
+         "status": {
+          "id": 1,
+          "name": "New"
+         },
+         "subject": "Admin Leaver - Ivan Testovenko",
+         "description": "Доброго дня!\r\nПрошу запустити процес припинення співпраці з Ivan Testovenko/Trainer/Lutsk\r\nПереадресація пошти: видалити\r\nПереадресація диску: recv.person@corp.example.com\r\n\r\nДякую.",
+         "custom_fields": [
+          {
+           "id": 11,
+           "name": "Contractor (ENG)",
+           "value": "Ivan Testovenko"
+          },
+          {
+           "id": 103,
+           "name": "Contractor (UKR)",
+           "value": "Тестовенко Іван"
+          },
+          {
+           "id": 25,
+           "name": "Manager",
+           "value": "Mariia Probna"
+          },
+          {
+           "id": 30,
+           "name": "Termination date",
+           "value": "$YESTERDAY"
+          }
+         ]
+        }
+       ],
+       "total_count": 1
+      }
+     ],
+     "[Redmine] Get Ticket History": {
+      "__by_ticket": {
+       "319": {
+        "issue": {
+         "status": {
+          "id": 1
+         },
+         "journals": [
+          {
+           "id": 0,
+           "notes": "Автоматичний Offboarding успішно завершено!\n\nДетальний звіт про закриття доступів:\n1. Active Directory: ...\n3. Google Диск (Перенесення документів):\n   • Новий власник (керівник): x@corp.example.com\n   • Статус: Успішно ініційовано системою.\nЗаборгованості по техніці немає.",
+           "user": {
+            "name": "Automation Bot"
+           }
+          },
+          {
+           "id": 1,
+           "notes": "Добрий день. За Іваном закріплений ноутбук 2000000000001",
+           "user": {
+            "name": "IT"
+           }
+          }
+         ]
+        }
+       }
+      }
+     },
+     "[AD] Search User": {
+      "__by_ticket": {
+       "319": [
+        {
+         "dn": "CN=Ivan Testovenko,OU=Уволенные,DC=example,DC=com",
+         "sAMAccountName": "ivan.testovenko",
+         "givenName": "Ivan",
+         "sn": "Testovenko",
+         "userAccountControl": "514"
+        }
+       ]
+      }
+     },
+     "[Google] Find User": {
+      "__by_ticket": {
+       "319": {
+        "statusCode": 200,
+        "body": {
+         "users": [
+          {
+           "id": "g-ivan.testovenko",
+           "primaryEmail": "ivan.testovenko@corp.example.com",
+           "name": {
+            "fullName": "Ivan Testovenko"
+           },
+           "suspended": true
+          }
+         ]
+        }
+       }
+      }
+     },
+     "[Google] Find Drive Recipient": {
+      "__by_ticket": {
+       "319": {
+        "statusCode": 200,
+        "body": {
+         "id": "g-recv.person",
+         "primaryEmail": "recv.person@corp.example.com",
+         "name": {
+          "fullName": "Recv Person"
+         },
+         "suspended": false
+        }
+       }
+      }
+     },
+     "[M365] Search User": {
+      "__by_ticket": {
+       "319": {
+        "statusCode": 200,
+        "body": {
+         "value": []
+        }
+       }
+      }
+     },
+     "[Google] Suspend User": {
+      "statusCode": 200,
+      "body": {
+       "suspended": true
+      }
+     },
+     "[Google] Transfer Drive": {
+      "statusCode": 200,
+      "body": {
+       "overallTransferStatusCode": "inProgress"
+      }
+     },
+     "[M365] Delete User": {
+      "statusCode": 204,
+      "body": ""
+     }
+    },
+    "counts": {
+     "[Redmine] Update Ticket": 1
+    },
+    "has": {
+     "Code: Build Report": [
+      {
+       "close": false,
+       "note": "~повторно нічого не виконувалось"
+      }
+     ]
+    }
+   },
+   {
+    "stubs": {
+     "[Redmine] Get Open Leaver Tickets": [
+      {
+       "issues": [
+        {
+         "id": 319,
+         "tracker": {
+          "id": 25,
+          "name": "Admin | Leaver"
+         },
+         "status": {
+          "id": 1,
+          "name": "New"
+         },
+         "subject": "Admin Leaver - Ivan Testovenko",
+         "description": "Доброго дня!\r\nПрошу запустити процес припинення співпраці з Ivan Testovenko/Trainer/Lutsk\r\nПереадресація пошти: видалити\r\nПереадресація диску: recv.person@corp.example.com\r\n\r\nДякую.",
+         "custom_fields": [
+          {
+           "id": 11,
+           "name": "Contractor (ENG)",
+           "value": "Ivan Testovenko"
+          },
+          {
+           "id": 103,
+           "name": "Contractor (UKR)",
+           "value": "Тестовенко Іван"
+          },
+          {
+           "id": 25,
+           "name": "Manager",
+           "value": "Mariia Probna"
+          },
+          {
+           "id": 30,
+           "name": "Termination date",
+           "value": "$YESTERDAY"
+          }
+         ]
+        }
+       ],
+       "total_count": 1
+      }
+     ],
+     "[Redmine] Get Ticket History": {
+      "__by_ticket": {
+       "319": {
+        "issue": {
+         "status": {
+          "id": 1
+         },
+         "journals": [
+          {
+           "id": 0,
+           "notes": "Автоматичний Offboarding успішно завершено!\n\nДетальний звіт про закриття доступів:\n1. Active Directory: ...\n3. Google Диск (Перенесення документів):\n   • Новий власник (керівник): x@corp.example.com\n   • Статус: Успішно ініційовано системою.\nЗаборгованості по техніці немає.",
+           "user": {
+            "name": "Automation Bot"
+           }
+          },
+          {
+           "id": 1,
+           "notes": "Добрий день. За Іваном закріплений ноутбук 2000000000001",
+           "user": {
+            "name": "IT"
+           }
+          }
+         ]
+        }
+       }
+      }
+     },
+     "[AD] Search User": {
+      "__by_ticket": {
+       "319": [
+        {
+         "dn": "CN=Ivan Testovenko,OU=Уволенные,DC=example,DC=com",
+         "sAMAccountName": "ivan.testovenko",
+         "givenName": "Ivan",
+         "sn": "Testovenko",
+         "userAccountControl": "514"
+        }
+       ]
+      }
+     },
+     "[Google] Find User": {
+      "__by_ticket": {
+       "319": {
+        "statusCode": 200,
+        "body": {
+         "users": [
+          {
+           "id": "g-ivan.testovenko",
+           "primaryEmail": "ivan.testovenko@corp.example.com",
+           "name": {
+            "fullName": "Ivan Testovenko"
+           },
+           "suspended": true
+          }
+         ]
+        }
+       }
+      }
+     },
+     "[Google] Find Drive Recipient": {
+      "__by_ticket": {
+       "319": {
+        "statusCode": 200,
+        "body": {
+         "id": "g-recv.person",
+         "primaryEmail": "recv.person@corp.example.com",
+         "name": {
+          "fullName": "Recv Person"
+         },
+         "suspended": false
+        }
+       }
+      }
+     },
+     "[M365] Search User": {
+      "__by_ticket": {
+       "319": {
+        "statusCode": 200,
+        "body": {
+         "value": []
+        }
+       }
+      }
+     },
+     "[Google] Suspend User": {
+      "statusCode": 200,
+      "body": {
+       "suspended": true
+      }
+     },
+     "[Google] Transfer Drive": {
+      "statusCode": 200,
+      "body": {
+       "overallTransferStatusCode": "inProgress"
+      }
+     },
+     "[M365] Delete User": {
+      "statusCode": 204,
+      "body": ""
+     }
+    },
+    "counts": {
+     "[Redmine] Update Ticket": 0
+    }
+   }
+  ]
+ },
+ {
+  "name": "помилка блокування в AD: перенос не робимо, решта систем працює",
+  "stubs": {
+   "[Redmine] Get Open Leaver Tickets": [
+    {
+     "issues": [
+      {
+       "id": 320,
+       "tracker": {
+        "id": 25,
+        "name": "Admin | Leaver"
+       },
+       "status": {
+        "id": 1,
+        "name": "New"
+       },
+       "subject": "Admin Leaver - Ivan Testovenko",
+       "description": "Доброго дня!\r\nПрошу запустити процес припинення співпраці з Ivan Testovenko/Trainer/Lutsk\r\nПереадресація пошти: видалити\r\nПереадресація диску: recv.person@corp.example.com\r\n\r\nДякую.",
+       "custom_fields": [
+        {
+         "id": 11,
+         "name": "Contractor (ENG)",
+         "value": "Ivan Testovenko"
+        },
+        {
+         "id": 103,
+         "name": "Contractor (UKR)",
+         "value": "Тестовенко Іван"
+        },
+        {
+         "id": 25,
+         "name": "Manager",
+         "value": "Mariia Probna"
+        },
+        {
+         "id": 30,
+         "name": "Termination date",
+         "value": "$YESTERDAY"
+        }
+       ]
+      }
+     ],
+     "total_count": 1
+    }
+   ],
+   "[Redmine] Get Ticket History": {
+    "__by_ticket": {
+     "320": {
+      "issue": {
+       "status": {
+        "id": 1
+       },
+       "journals": [
+        {
+         "id": 0,
+         "notes": "Заборгованості по техніці немає",
+         "user": {
+          "name": "IT"
+         }
+        }
+       ]
+      }
+     }
+    }
+   },
+   "[AD] Search User": {
+    "__by_ticket": {
+     "320": [
+      {
+       "dn": "CN=Ivan Testovenko,OU=administrative_staff,OU=AllUsers,OU=COMPANY,DC=example,DC=com",
+       "sAMAccountName": "ivan.testovenko",
+       "givenName": "Ivan",
+       "sn": "Testovenko",
+       "userAccountControl": "512"
+      }
+     ]
+    }
+   },
+   "[Google] Find User": {
+    "__by_ticket": {
+     "320": {
+      "statusCode": 200,
+      "body": {
+       "users": [
+        {
+         "id": "g-ivan.testovenko",
+         "primaryEmail": "ivan.testovenko@corp.example.com",
+         "name": {
+          "fullName": "Ivan Testovenko"
+         },
+         "suspended": false
+        }
+       ]
+      }
+     }
+    }
+   },
+   "[Google] Find Drive Recipient": {
+    "__by_ticket": {
+     "320": {
+      "statusCode": 200,
+      "body": {
+       "id": "g-recv.person",
+       "primaryEmail": "recv.person@corp.example.com",
+       "name": {
+        "fullName": "Recv Person"
+       },
+       "suspended": false
+      }
+     }
+    }
+   },
+   "[M365] Search User": {
+    "__by_ticket": {
+     "320": {
+      "statusCode": 200,
+      "body": {
+       "value": [
+        {
+         "id": "m-ivan.testovenko",
+         "userPrincipalName": "ivan.testovenko@m365.example.com",
+         "userType": "Member"
+        }
+       ]
+      }
+     }
+    }
+   },
+   "[AD] Disable Account": {
+    "__by_ticket": {
+     "320": {
+      "__throw": "Insufficient access rights"
+     }
+    }
+   },
+   "[Google] Suspend User": {
+    "statusCode": 200,
+    "body": {
+     "suspended": true
+    }
+   },
+   "[Google] Transfer Drive": {
+    "statusCode": 200,
+    "body": {
+     "overallTransferStatusCode": "inProgress"
+    }
+   },
+   "[M365] Delete User": {
+    "statusCode": 204,
+    "body": ""
+   }
+  },
+  "counts": {
+   "[AD] Move to Fired OU": 0,
+   "[Google] Suspend User": 1
+  },
+  "has": {
+   "Code: Build Report": [
+    {
+     "close": false,
+     "note": "~НЕ виконано (блокування: "
+    },
+    {
+     "note": "~Insufficient access rights"
+    }
+   ]
+  }
+ },
+ {
+  "name": "помилка переносу в AD",
+  "stubs": {
+   "[Redmine] Get Open Leaver Tickets": [
+    {
+     "issues": [
+      {
+       "id": 321,
+       "tracker": {
+        "id": 25,
+        "name": "Admin | Leaver"
+       },
+       "status": {
+        "id": 1,
+        "name": "New"
+       },
+       "subject": "Admin Leaver - Ivan Testovenko",
+       "description": "Доброго дня!\r\nПрошу запустити процес припинення співпраці з Ivan Testovenko/Trainer/Lutsk\r\nПереадресація пошти: видалити\r\nПереадресація диску: recv.person@corp.example.com\r\n\r\nДякую.",
+       "custom_fields": [
+        {
+         "id": 11,
+         "name": "Contractor (ENG)",
+         "value": "Ivan Testovenko"
+        },
+        {
+         "id": 103,
+         "name": "Contractor (UKR)",
+         "value": "Тестовенко Іван"
+        },
+        {
+         "id": 25,
+         "name": "Manager",
+         "value": "Mariia Probna"
+        },
+        {
+         "id": 30,
+         "name": "Termination date",
+         "value": "$YESTERDAY"
+        }
+       ]
+      }
+     ],
+     "total_count": 1
+    }
+   ],
+   "[Redmine] Get Ticket History": {
+    "__by_ticket": {
+     "321": {
+      "issue": {
+       "status": {
+        "id": 1
+       },
+       "journals": [
+        {
+         "id": 0,
+         "notes": "Заборгованості по техніці немає",
+         "user": {
+          "name": "IT"
+         }
+        }
+       ]
+      }
+     }
+    }
+   },
+   "[AD] Search User": {
+    "__by_ticket": {
+     "321": [
+      {
+       "dn": "CN=Ivan Testovenko,OU=administrative_staff,OU=AllUsers,OU=COMPANY,DC=example,DC=com",
+       "sAMAccountName": "ivan.testovenko",
+       "givenName": "Ivan",
+       "sn": "Testovenko",
+       "userAccountControl": "512"
+      }
+     ]
+    }
+   },
+   "[Google] Find User": {
+    "__by_ticket": {
+     "321": {
+      "statusCode": 200,
+      "body": {
+       "users": [
+        {
+         "id": "g-ivan.testovenko",
+         "primaryEmail": "ivan.testovenko@corp.example.com",
+         "name": {
+          "fullName": "Ivan Testovenko"
+         },
+         "suspended": false
+        }
+       ]
+      }
+     }
+    }
+   },
+   "[Google] Find Drive Recipient": {
+    "__by_ticket": {
+     "321": {
+      "statusCode": 200,
+      "body": {
+       "id": "g-recv.person",
+       "primaryEmail": "recv.person@corp.example.com",
+       "name": {
+        "fullName": "Recv Person"
+       },
+       "suspended": false
+      }
+     }
+    }
+   },
+   "[M365] Search User": {
+    "__by_ticket": {
+     "321": {
+      "statusCode": 200,
+      "body": {
+       "value": [
+        {
+         "id": "m-ivan.testovenko",
+         "userPrincipalName": "ivan.testovenko@m365.example.com",
+         "userType": "Member"
+        }
+       ]
+      }
+     }
+    }
+   },
+   "[AD] Move to Fired OU": {
+    "__by_ticket": {
+     "321": {
+      "__throw": "No such object"
+     }
+    }
+   },
+   "[Google] Suspend User": {
+    "statusCode": 200,
+    "body": {
+     "suspended": true
+    }
+   },
+   "[Google] Transfer Drive": {
+    "statusCode": 200,
+    "body": {
+     "overallTransferStatusCode": "inProgress"
+    }
+   },
+   "[M365] Delete User": {
+    "statusCode": 204,
+    "body": ""
+   }
+  },
+  "has": {
+   "Code: Build Report": [
+    {
+     "close": false,
+     "note": "~перенесення в «Уволенные»: No such object"
+    }
+   ]
+  }
+ },
+ {
+  "name": "M365: гостя #EXT# не рахуємо, видаляємо лише члена тенанта",
+  "stubs": {
+   "[Redmine] Get Open Leaver Tickets": [
+    {
+     "issues": [
+      {
+       "id": 322,
+       "tracker": {
+        "id": 25,
+        "name": "Admin | Leaver"
+       },
+       "status": {
+        "id": 1,
+        "name": "New"
+       },
+       "subject": "Admin Leaver - Ivan Testovenko",
+       "description": "Доброго дня!\r\nПрошу запустити процес припинення співпраці з Ivan Testovenko/Trainer/Lutsk\r\nПереадресація пошти: видалити\r\nПереадресація диску: recv.person@corp.example.com\r\n\r\nДякую.",
+       "custom_fields": [
+        {
+         "id": 11,
+         "name": "Contractor (ENG)",
+         "value": "Ivan Testovenko"
+        },
+        {
+         "id": 103,
+         "name": "Contractor (UKR)",
+         "value": "Тестовенко Іван"
+        },
+        {
+         "id": 25,
+         "name": "Manager",
+         "value": "Mariia Probna"
+        },
+        {
+         "id": 30,
+         "name": "Termination date",
+         "value": "$YESTERDAY"
+        }
+       ]
+      }
+     ],
+     "total_count": 1
+    }
+   ],
+   "[Redmine] Get Ticket History": {
+    "__by_ticket": {
+     "322": {
+      "issue": {
+       "status": {
+        "id": 1
+       },
+       "journals": [
+        {
+         "id": 0,
+         "notes": "Заборгованості по техніці немає",
+         "user": {
+          "name": "IT"
+         }
+        }
+       ]
+      }
+     }
+    }
+   },
+   "[AD] Search User": {
+    "__by_ticket": {
+     "322": [
+      {
+       "dn": "CN=Ivan Testovenko,OU=administrative_staff,OU=AllUsers,OU=COMPANY,DC=example,DC=com",
+       "sAMAccountName": "ivan.testovenko",
+       "givenName": "Ivan",
+       "sn": "Testovenko",
+       "userAccountControl": "512"
+      }
+     ]
+    }
+   },
+   "[Google] Find User": {
+    "__by_ticket": {
+     "322": {
+      "statusCode": 200,
+      "body": {
+       "users": [
+        {
+         "id": "g-ivan.testovenko",
+         "primaryEmail": "ivan.testovenko@corp.example.com",
+         "name": {
+          "fullName": "Ivan Testovenko"
+         },
+         "suspended": false
+        }
+       ]
+      }
+     }
+    }
+   },
+   "[Google] Find Drive Recipient": {
+    "__by_ticket": {
+     "322": {
+      "statusCode": 200,
+      "body": {
+       "id": "g-recv.person",
+       "primaryEmail": "recv.person@corp.example.com",
+       "name": {
+        "fullName": "Recv Person"
+       },
+       "suspended": false
+      }
+     }
+    }
+   },
+   "[M365] Search User": {
+    "__by_ticket": {
+     "322": {
+      "statusCode": 200,
+      "body": {
+       "value": [
+        {
+         "id": "m-ivan.testovenko",
+         "userPrincipalName": "ivan.testovenko@m365.example.com",
+         "userType": "Member"
+        },
+        {
+         "id": "m-ivan.testovenko_example.com#EXT#",
+         "userPrincipalName": "ivan.testovenko_example.com#EXT#@x.onmicrosoft.com",
+         "userType": "Guest"
+        }
+       ]
+      }
+     }
+    }
+   },
+   "[Google] Suspend User": {
+    "statusCode": 200,
+    "body": {
+     "suspended": true
+    }
+   },
+   "[Google] Transfer Drive": {
+    "statusCode": 200,
+    "body": {
+     "overallTransferStatusCode": "inProgress"
+    }
+   },
+   "[M365] Delete User": {
+    "statusCode": 204,
+    "body": ""
+   }
+  },
+  "counts": {
+   "[M365] Delete User": 1
+  },
+  "has": {
+   "Code: Build Report": [
+    {
+     "close": true
+    }
+   ]
+  }
+ },
+ {
+  "name": "M365: два члени тенанта -> нічого не видаляємо",
+  "stubs": {
+   "[Redmine] Get Open Leaver Tickets": [
+    {
+     "issues": [
+      {
+       "id": 323,
+       "tracker": {
+        "id": 25,
+        "name": "Admin | Leaver"
+       },
+       "status": {
+        "id": 1,
+        "name": "New"
+       },
+       "subject": "Admin Leaver - Ivan Testovenko",
+       "description": "Доброго дня!\r\nПрошу запустити процес припинення співпраці з Ivan Testovenko/Trainer/Lutsk\r\nПереадресація пошти: видалити\r\nПереадресація диску: recv.person@corp.example.com\r\n\r\nДякую.",
+       "custom_fields": [
+        {
+         "id": 11,
+         "name": "Contractor (ENG)",
+         "value": "Ivan Testovenko"
+        },
+        {
+         "id": 103,
+         "name": "Contractor (UKR)",
+         "value": "Тестовенко Іван"
+        },
+        {
+         "id": 25,
+         "name": "Manager",
+         "value": "Mariia Probna"
+        },
+        {
+         "id": 30,
+         "name": "Termination date",
+         "value": "$YESTERDAY"
+        }
+       ]
+      }
+     ],
+     "total_count": 1
+    }
+   ],
+   "[Redmine] Get Ticket History": {
+    "__by_ticket": {
+     "323": {
+      "issue": {
+       "status": {
+        "id": 1
+       },
+       "journals": [
+        {
+         "id": 0,
+         "notes": "Заборгованості по техніці немає",
+         "user": {
+          "name": "IT"
+         }
+        }
+       ]
+      }
+     }
+    }
+   },
+   "[AD] Search User": {
+    "__by_ticket": {
+     "323": [
+      {
+       "dn": "CN=Ivan Testovenko,OU=administrative_staff,OU=AllUsers,OU=COMPANY,DC=example,DC=com",
+       "sAMAccountName": "ivan.testovenko",
+       "givenName": "Ivan",
+       "sn": "Testovenko",
+       "userAccountControl": "512"
+      }
+     ]
+    }
+   },
+   "[Google] Find User": {
+    "__by_ticket": {
+     "323": {
+      "statusCode": 200,
+      "body": {
+       "users": [
+        {
+         "id": "g-ivan.testovenko",
+         "primaryEmail": "ivan.testovenko@corp.example.com",
+         "name": {
+          "fullName": "Ivan Testovenko"
+         },
+         "suspended": false
+        }
+       ]
+      }
+     }
+    }
+   },
+   "[Google] Find Drive Recipient": {
+    "__by_ticket": {
+     "323": {
+      "statusCode": 200,
+      "body": {
+       "id": "g-recv.person",
+       "primaryEmail": "recv.person@corp.example.com",
+       "name": {
+        "fullName": "Recv Person"
+       },
+       "suspended": false
+      }
+     }
+    }
+   },
+   "[M365] Search User": {
+    "__by_ticket": {
+     "323": {
+      "statusCode": 200,
+      "body": {
+       "value": [
+        {
+         "id": "m-ivan.testovenko",
+         "userPrincipalName": "ivan.testovenko@m365.example.com",
+         "userType": "Member"
+        },
+        {
+         "id": "m-ivan.testovenko2",
+         "userPrincipalName": "ivan.testovenko2@m365.example.com",
+         "userType": "Member"
+        }
+       ]
+      }
+     }
+    }
+   },
+   "[Google] Suspend User": {
+    "statusCode": 200,
+    "body": {
+     "suspended": true
+    }
+   },
+   "[Google] Transfer Drive": {
+    "statusCode": 200,
+    "body": {
+     "overallTransferStatusCode": "inProgress"
+    }
+   },
+   "[M365] Delete User": {
+    "statusCode": 204,
+    "body": ""
+   }
+  },
+  "counts": {
+   "[M365] Delete User": 0
+  },
+  "has": {
+   "Code: Build Report": [
+    {
+     "close": false,
+     "note": "~Microsoft 365: Знайдено кілька акаунтів"
+    }
+   ]
+  }
+ },
+ {
+  "name": "логіни в системах різні: попередження",
+  "stubs": {
+   "[Redmine] Get Open Leaver Tickets": [
+    {
+     "issues": [
+      {
+       "id": 324,
+       "tracker": {
+        "id": 25,
+        "name": "Admin | Leaver"
+       },
+       "status": {
+        "id": 1,
+        "name": "New"
+       },
+       "subject": "Admin Leaver - Ivan Testovenko",
+       "description": "Доброго дня!\r\nПрошу запустити процес припинення співпраці з Ivan Testovenko/Trainer/Lutsk\r\nПереадресація пошти: видалити\r\nПереадресація диску: recv.person@corp.example.com\r\n\r\nДякую.",
+       "custom_fields": [
+        {
+         "id": 11,
+         "name": "Contractor (ENG)",
+         "value": "Ivan Testovenko"
+        },
+        {
+         "id": 103,
+         "name": "Contractor (UKR)",
+         "value": "Тестовенко Іван"
+        },
+        {
+         "id": 25,
+         "name": "Manager",
+         "value": "Mariia Probna"
+        },
+        {
+         "id": 30,
+         "name": "Termination date",
+         "value": "$YESTERDAY"
+        }
+       ]
+      }
+     ],
+     "total_count": 1
+    }
+   ],
+   "[Redmine] Get Ticket History": {
+    "__by_ticket": {
+     "324": {
+      "issue": {
+       "status": {
+        "id": 1
+       },
+       "journals": [
+        {
+         "id": 0,
+         "notes": "Заборгованості по техніці немає",
+         "user": {
+          "name": "IT"
+         }
+        }
+       ]
+      }
+     }
+    }
+   },
+   "[AD] Search User": {
+    "__by_ticket": {
+     "324": [
+      {
+       "dn": "CN=Ivan Testovenko,OU=administrative_staff,OU=AllUsers,OU=COMPANY,DC=example,DC=com",
+       "sAMAccountName": "i.testovenko",
+       "givenName": "Ivan",
+       "sn": "Testovenko",
+       "userAccountControl": "512"
+      }
+     ]
+    }
+   },
+   "[Google] Find User": {
+    "__by_ticket": {
+     "324": {
+      "statusCode": 200,
+      "body": {
+       "users": [
+        {
+         "id": "g-ivan.testovenko",
+         "primaryEmail": "ivan.testovenko@corp.example.com",
+         "name": {
+          "fullName": "Ivan Testovenko"
+         },
+         "suspended": false
+        }
+       ]
+      }
+     }
+    }
+   },
+   "[Google] Find Drive Recipient": {
+    "__by_ticket": {
+     "324": {
+      "statusCode": 200,
+      "body": {
+       "id": "g-recv.person",
+       "primaryEmail": "recv.person@corp.example.com",
+       "name": {
+        "fullName": "Recv Person"
+       },
+       "suspended": false
+      }
+     }
+    }
+   },
+   "[M365] Search User": {
+    "__by_ticket": {
+     "324": {
+      "statusCode": 200,
+      "body": {
+       "value": [
+        {
+         "id": "m-ivan.testovenko",
+         "userPrincipalName": "ivan.testovenko@m365.example.com",
+         "userType": "Member"
+        }
+       ]
+      }
+     }
+    }
+   },
+   "[Google] Suspend User": {
+    "statusCode": 200,
+    "body": {
+     "suspended": true
+    }
+   },
+   "[Google] Transfer Drive": {
+    "statusCode": 200,
+    "body": {
+     "overallTransferStatusCode": "inProgress"
+    }
+   },
+   "[M365] Delete User": {
+    "statusCode": 204,
+    "body": ""
+   }
+  },
+  "has": {
+   "Code: Build Report": [
+    {
+     "note": "~Логіни в системах відрізняються (i.testovenko, ivan.testovenko)"
+    }
+   ]
+  }
+ },
+ {
+  "name": "передача диска 403: проблема, заявка відкрита",
+  "stubs": {
+   "[Redmine] Get Open Leaver Tickets": [
+    {
+     "issues": [
+      {
+       "id": 325,
+       "tracker": {
+        "id": 25,
+        "name": "Admin | Leaver"
+       },
+       "status": {
+        "id": 1,
+        "name": "New"
+       },
+       "subject": "Admin Leaver - Ivan Testovenko",
+       "description": "Доброго дня!\r\nПрошу запустити процес припинення співпраці з Ivan Testovenko/Trainer/Lutsk\r\nПереадресація пошти: видалити\r\nПереадресація диску: recv.person@corp.example.com\r\n\r\nДякую.",
+       "custom_fields": [
+        {
+         "id": 11,
+         "name": "Contractor (ENG)",
+         "value": "Ivan Testovenko"
+        },
+        {
+         "id": 103,
+         "name": "Contractor (UKR)",
+         "value": "Тестовенко Іван"
+        },
+        {
+         "id": 25,
+         "name": "Manager",
+         "value": "Mariia Probna"
+        },
+        {
+         "id": 30,
+         "name": "Termination date",
+         "value": "$YESTERDAY"
+        }
+       ]
+      }
+     ],
+     "total_count": 1
+    }
+   ],
+   "[Redmine] Get Ticket History": {
+    "__by_ticket": {
+     "325": {
+      "issue": {
+       "status": {
+        "id": 1
+       },
+       "journals": [
+        {
+         "id": 0,
+         "notes": "Заборгованості по техніці немає",
+         "user": {
+          "name": "IT"
+         }
+        }
+       ]
+      }
+     }
+    }
+   },
+   "[AD] Search User": {
+    "__by_ticket": {
+     "325": [
+      {
+       "dn": "CN=Ivan Testovenko,OU=administrative_staff,OU=AllUsers,OU=COMPANY,DC=example,DC=com",
+       "sAMAccountName": "ivan.testovenko",
+       "givenName": "Ivan",
+       "sn": "Testovenko",
+       "userAccountControl": "512"
+      }
+     ]
+    }
+   },
+   "[Google] Find User": {
+    "__by_ticket": {
+     "325": {
+      "statusCode": 200,
+      "body": {
+       "users": [
+        {
+         "id": "g-ivan.testovenko",
+         "primaryEmail": "ivan.testovenko@corp.example.com",
+         "name": {
+          "fullName": "Ivan Testovenko"
+         },
+         "suspended": false
+        }
+       ]
+      }
+     }
+    }
+   },
+   "[Google] Find Drive Recipient": {
+    "__by_ticket": {
+     "325": {
+      "statusCode": 200,
+      "body": {
+       "id": "g-recv.person",
+       "primaryEmail": "recv.person@corp.example.com",
+       "name": {
+        "fullName": "Recv Person"
+       },
+       "suspended": false
+      }
+     }
+    }
+   },
+   "[M365] Search User": {
+    "__by_ticket": {
+     "325": {
+      "statusCode": 200,
+      "body": {
+       "value": [
+        {
+         "id": "m-ivan.testovenko",
+         "userPrincipalName": "ivan.testovenko@m365.example.com",
+         "userType": "Member"
+        }
+       ]
+      }
+     }
+    }
+   },
+   "[Google] Transfer Drive": {
+    "__by_ticket": {
+     "325": {
+      "statusCode": 403,
+      "body": {
+       "error": {
+        "message": "Insufficient Permission"
+       }
+      }
+     }
+    }
+   },
+   "[Google] Suspend User": {
+    "statusCode": 200,
+    "body": {
+     "suspended": true
+    }
+   },
+   "[M365] Delete User": {
+    "statusCode": 204,
+    "body": ""
+   }
+  },
+  "has": {
+   "Code: Build Report": [
+    {
+     "close": false,
+     "note": "~перенесення НЕ запущено (403: Insufficient Permission)"
+    }
+   ]
+  }
+ },
+ {
+  "name": "дві заявки: проблема в першій не зупиняє другу",
+  "stubs": {
+   "[Redmine] Get Open Leaver Tickets": [
+    {
+     "issues": [
+      {
+       "id": 326,
+       "tracker": {
+        "id": 25,
+        "name": "Admin | Leaver"
+       },
+       "status": {
+        "id": 1,
+        "name": "New"
+       },
+       "subject": "Admin Leaver - Ivan Testovenko",
+       "description": "Доброго дня!\r\nПрошу запустити процес припинення співпраці з Ivan Testovenko/Trainer/Lutsk\r\nПереадресація пошти: видалити\r\nПереадресація диску: recv.person@corp.example.com\r\n\r\nДякую.",
+       "custom_fields": [
+        {
+         "id": 11,
+         "name": "Contractor (ENG)",
+         "value": "Ivan Testovenko"
+        },
+        {
+         "id": 103,
+         "name": "Contractor (UKR)",
+         "value": "Тестовенко Іван"
+        },
+        {
+         "id": 25,
+         "name": "Manager",
+         "value": "Mariia Probna"
+        },
+        {
+         "id": 30,
+         "name": "Termination date",
+         "value": "$YESTERDAY"
+        }
+       ]
+      },
+      {
+       "id": 327,
+       "tracker": {
+        "id": 25,
+        "name": "Admin | Leaver"
+       },
+       "status": {
+        "id": 1,
+        "name": "New"
+       },
+       "subject": "Admin Leaver - Ivan Testovenko",
+       "description": "Доброго дня!\r\nПрошу запустити процес припинення співпраці з Ivan Testovenko/Trainer/Lutsk\r\nПереадресація пошти: видалити\r\nПереадресація диску: recv.person@corp.example.com\r\n\r\nДякую.",
+       "custom_fields": [
+        {
+         "id": 11,
+         "name": "Contractor (ENG)",
+         "value": "Ivan Testovenko"
+        },
+        {
+         "id": 103,
+         "name": "Contractor (UKR)",
+         "value": "Тестовенко Іван"
+        },
+        {
+         "id": 25,
+         "name": "Manager",
+         "value": "Mariia Probna"
+        },
+        {
+         "id": 30,
+         "name": "Termination date",
+         "value": "$YESTERDAY"
+        }
+       ]
+      }
+     ],
+     "total_count": 2
+    }
+   ],
+   "[Redmine] Get Ticket History": {
+    "__by_ticket": {
+     "326": {
+      "issue": {
+       "status": {
+        "id": 1
+       },
+       "journals": [
+        {
+         "id": 0,
+         "notes": "Заборгованості по техніці немає",
+         "user": {
+          "name": "IT"
+         }
+        }
+       ]
+      }
+     },
+     "327": {
+      "issue": {
+       "status": {
+        "id": 1
+       },
+       "journals": [
+        {
+         "id": 0,
+         "notes": "Заборгованості по техніці немає",
+         "user": {
+          "name": "IT"
+         }
+        }
+       ]
+      }
+     }
+    }
+   },
+   "[AD] Search User": {
+    "__by_ticket": {
+     "326": [
+      {
+       "dn": "CN=Ivan Testovenko,OU=administrative_staff,OU=AllUsers,OU=COMPANY,DC=example,DC=com",
+       "sAMAccountName": "ivan.testovenko",
+       "givenName": "Ivan",
+       "sn": "Testovenko",
+       "userAccountControl": "512"
+      }
+     ],
+     "327": []
+    }
+   },
+   "[Google] Find User": {
+    "__by_ticket": {
+     "326": {
+      "statusCode": 200,
+      "body": {
+       "kind": "admin#directory#users"
+      }
+     },
+     "327": {
+      "statusCode": 200,
+      "body": {
+       "users": [
+        {
+         "id": "g-ivan.testovenko",
+         "primaryEmail": "ivan.testovenko@corp.example.com",
+         "name": {
+          "fullName": "Ivan Testovenko"
+         },
+         "suspended": false
+        }
+       ]
+      }
+     }
+    }
+   },
+   "[Google] Find Drive Recipient": {
+    "__by_ticket": {
+     "327": {
+      "statusCode": 200,
+      "body": {
+       "id": "g-recv.person",
+       "primaryEmail": "recv.person@corp.example.com",
+       "name": {
+        "fullName": "Recv Person"
+       },
+       "suspended": false
+      }
+     }
+    }
+   },
+   "[M365] Search User": {
+    "__by_ticket": {
+     "326": {
+      "statusCode": 200,
+      "body": {
+       "value": []
+      }
+     },
+     "327": {
+      "statusCode": 200,
+      "body": {
+       "value": []
+      }
+     }
+    }
+   },
+   "[Google] Suspend User": {
+    "statusCode": 200,
+    "body": {
+     "suspended": true
+    }
+   },
+   "[Google] Transfer Drive": {
+    "statusCode": 200,
+    "body": {
+     "overallTransferStatusCode": "inProgress"
+    }
+   },
+   "[M365] Delete User": {
+    "statusCode": 204,
+    "body": ""
+   }
+  },
+  "counts": {
+   "[Redmine] Update Ticket": 2,
+   "[Sheets] Add to Archive": 1
+  },
+  "has": {
+   "[Redmine] Update Ticket": [
+    {
+     "id": 326
+    },
+    {
+     "id": 327
+    }
+   ]
+  }
+ }
+]
