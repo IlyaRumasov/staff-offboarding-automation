@@ -57,7 +57,10 @@ if (d.ad_status === 'not_found') {
   const body =
     `1. Active Directory:\n• Логін: ${d.login}` +
     (d.found_by_name ? ` (у заявці не вказано, знайдено в AD за ПІБ «${d.fio}»: ${d.gn} ${d.sn}, єдиний збіг` +
-      (d.found_by_login_pattern ? '; ім’я/прізвище в AD не заповнені, знайдено за шаблоном логіна' : '') + ')' : '') +
+      (d.found_by_login_pattern ? '; ім’я/прізвище в AD не заповнені, знайдено за шаблоном логіна' : '') +
+      (d.tenure_checked ? '; перевірено за датою створення: ' + d.tenure_checked : '') +
+      (d.skipped_tenure ? '; інші акаунти з таким іменем пропущені (дата створення не збігається): ' + d.skipped_tenure : '') +
+      (d.ignored_disabled ? '; інші акаунти з таким іменем уже заблоковані й пропущені: ' + d.ignored_disabled : '') + ')' : '') +
     `\n• Статус: ${ad}\n` +
     `2. Google Workspace (Guest):\n• Акаунт: ${d.guest_email}\n• Статус: ${gw}\n`;
 

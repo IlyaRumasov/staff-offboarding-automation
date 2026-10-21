@@ -10,11 +10,12 @@ UPDATE = "[Redmine] Update Ticket"
 CLOSE, SHEET, CMISS, CPROB = UPDATE + "::close=True", "[Sheets] Add to Archive", "[Redmine] Comment Missing Data", UPDATE + "::close=False"
 
 
-def issue(id_, login="test.user", date="$YESTERDAY", tracker=41, cf=None, desc=None, subject_date=None, fio="Тестовий Користувач Іванович"):
+def issue(id_, login="test.user", date="$YESTERDAY", tracker=41, cf=None, desc=None, subject_date=None, fio="Тестовий Користувач Іванович", tenure=None):
     d = desc if desc is not None else (
         "В системі HRIS створено запит на розірвання договору. \r\n"
         f"        ГА - {fio} \r\n        AD - {login} \r\n        тел: +380000000{id_ % 1000:03d} \r\n"
-        "        Автор запиту - t.author\r\n        Заборгованості по техніці немає \r\n")
+        "        Автор запиту - t.author\r\n        Заборгованості по техніці немає \r\n"
+        + (f"        Загалом днів співпраці: {tenure}\r\n" if tenure is not None else ""))
     fields = list(cf or [])
     if date:
         fields.append({"id": 30, "name": "Termination date", "value": date})
@@ -23,9 +24,12 @@ def issue(id_, login="test.user", date="$YESTERDAY", tracker=41, cf=None, desc=N
             "description": d, "custom_fields": fields}
 
 
-def person(sam, gn, sn, ou=OU, uac="512"):
-    return {"dn": f"CN={gn} {sn},OU=linear_staff,{ou}" if ou == OU else f"CN={gn} {sn},{ou}", "sAMAccountName": sam,
+def person(sam, gn, sn, ou=OU, uac="512", created=None):
+    p = {"dn": f"CN={gn} {sn},OU=linear_staff,{ou}" if ou == OU else f"CN={gn} {sn},{ou}", "sAMAccountName": sam,
             "givenName": gn, "sn": sn, "displayName": f"{gn} {sn}", "cn": f"{gn} {sn}", "userAccountControl": uac}
+    if created:
+        p["whenCreated"] = created
+    return p
 
 
 def fetch(*iss):
@@ -50,7 +54,7 @@ cases = [
      "stubs": {F: fetch(issue(50462, login="", fio="Щербак Юлія Петрівна")),
                LS: by({"Shcherbak": [person("y.shcherbak", "Yuliia", "Shcherbak")]}), GW: by({"Shcherbak": GW204})},
      "counts": {CMISS: 0, UP: 1, MV: 1, CLOSE: 1, SHEET: 1},
-     "has": {"Code: Parse Tickets": [{"lookup": "name", "sn": "Shcherbak", "gn": "Yuliia", "ldap_filter": "(&(objectClass=user)(|(sn=Shcherbak)(sAMAccountName=yuliia.shcherbak)(sAMAccountName=y.shcherbak)(sAMAccountName=ms.y.shcherbak)(sAMAccountName=ms.yuliia.shcherbak)))"}],
+     "has": {"Code: Parse Tickets": [{"lookup": "name", "sn": "Shcherbak", "gn": "Yuliia", "ldap_filter": "~(sn=Shcherbak)"}],
              DEC: [{"login": "y.shcherbak", "found_by_name": True, "guest_email": "y.shcherbak_example.com@tenant.example.org.guest.google"}],
              CLOSE: [{"note": "~знайдено в AD за ПІБ"}], SHEET: [{"login": "y.shcherbak"}]}},
     {"name": "порожній «AD -» і немає ПІБ: коментар", "stubs": {F: fetch(issue(50461, login="", fio=""))},
@@ -67,12 +71,58 @@ cases = [
     {"name": "ПІБ лише з теми, якщо рядка «ГА -» немає",
      "stubs": {F: fetch(issue(206, login="", fio="Сидоренко Олег", desc="Запит на розірвання. \r\n AD - \r\n тел: +380000000206"))},
      "has": {"Code: Parse Tickets": [{"sn": "Sydorenko", "gn": "Oleh", "lookup": "name"}]}},
-    {"name": "за ПІБ два збіги: нічого не блокуємо, кандидати в коментарі",
+    {"name": "за ПІБ два активні збіги: нічого не блокуємо, кандидати в коментарі",
      "stubs": {F: fetch(issue(207, login="", fio="Коваль Іван")),
-               LS: by({"Koval": [person("i.koval", "Ivan", "Koval"), person("ivan.koval", "Ivan", "Koval", ou=FIRED, uac="514"),
-                                 person("p.koval", "Petro", "Koval")]})},
+               LS: by({"Koval": [person("i.koval", "Ivan", "Koval"), person("ivan.koval", "Ivan", "Koval"), person("p.koval", "Petro", "Koval")]})},
      "counts": {UP: 0, GW: 0, CLOSE: 0, CPROB: 1},
-     "has": {CPROB: [{"id": 207, "note": "~i.koval (linear_staff, активний); ivan.koval (Уволенные, заблокований)"}]}},
+     "has": {CPROB: [{"id": 207, "note": "~i.koval (linear_staff, активний); ivan.koval (linear_staff, активний)"}]}},
+    {"name": "за ПІБ активний + заблокований дублікат: беремо активного, дублікат у звіті",
+     "stubs": {F: fetch(issue(214, login="", fio="Тестер Адам")),
+               LS: by({"Tester": [person("a.tester", "Adam", "Tester", ou="OU=Client,OU=AllUsers,OU=COMPANY,DC=example,DC=com", uac="514"),
+                                 person("adam.tester", "Adam", "Tester")]}), GW: by({"Tester": GW204})},
+     "counts": {UP: 1, MV: 1, CLOSE: 1, CPROB: 0},
+     "has": {DEC: [{"login": "adam.tester", "found_by_name": True}], CLOSE: [{"note": "~пропущені: a.tester (Client, заблокований)"}]}},
+    {"name": "за ПІБ усі збіги заблоковані (два): стоп, кандидати в коментарі",
+     "stubs": {F: fetch(issue(215, login="", fio="Петренко Андрій")),
+               LS: by({"Petrenko": [person("a.petrenko", "Andrii", "Petrenko", uac="514"), person("andrii.petrenko", "Andrii", "Petrenko", uac="514")]})},
+     "counts": {UP: 0, GW: 0, CPROB: 1}, "has": {CPROB: [{"note": "~знайдено кілька акаунтів"}]}},
+    {"name": "латиниця ЗАГЛАВНИМИ з трьох слів (реальна заявка): шукаємо «перше + останнє», знаходимо Adam Tester",
+     "stubs": {F: fetch(issue(216, login="", fio="ADAM LEOPOLD TESTER")),
+               LS: by({"Tester": [person("adam.tester", "Adam", "Tester")]}), GW: by({"Tester": GW204})},
+     "counts": {UP: 1, CLOSE: 1},
+     "has": {"Code: Parse Tickets": [{"gn": "Adam", "sn": "Tester", "pairs": [["Adam", "Tester"], ["Tester", "Adam"], ["Adam", "Leopold"], ["Leopold", "Adam"]]}],
+             DEC: [{"login": "adam.tester", "found_by_name": True}]}},
+    {"name": "термін співпраці збігається з датою створення лише одного з двох активних: беремо його, перевірка в звіті",
+     "stubs": {F: fetch(issue(221, login="", fio="Тестер Адам", tenure=24)),
+               LS: by({"Tester": [person("a.tester", "Adam", "Tester", created="$AD_CREATED_60"),
+                                 person("adam.tester", "Adam", "Tester", created="$AD_CREATED_24")]}), GW: by({"Tester": GW204})},
+     "counts": {UP: 1, CLOSE: 1},
+     "has": {DEC: [{"login": "adam.tester"}], CLOSE: [{"note": "~перевірено за датою створення"}, {"note": "~a.tester (linear_staff, активний), створено"}]}},
+    {"name": "термін співпраці не збігається з жодним акаунтом з таким іменем: стоп, коментар з датами",
+     "stubs": {F: fetch(issue(222, login="", fio="Коваль Іван", tenure=24)),
+               LS: by({"Koval": [person("i.koval", "Ivan", "Koval", created="$AD_CREATED_300")]})},
+     "counts": {UP: 0, GW: 0, CLOSE: 0, CPROB: 1},
+     "has": {CPROB: [{"note": "~дата його створення не збігається з тривалістю співпраці"}]}},
+    {"name": "термін співпраці збігається з єдиним акаунтом (допуск 3 дні): блокуємо",
+     "stubs": {F: fetch(issue(223, login="", fio="Іваненко Петро", tenure=24)),
+               LS: by({"Ivanenko": [person("p.ivanenko", "Petro", "Ivanenko", created="$AD_CREATED_26")]}), GW: by({"Ivanenko": GW204})},
+     "counts": {UP: 1, CLOSE: 1}},
+    {"name": "термін співпраці є, два акаунти підходять за датою: стоп (неоднозначно)",
+     "stubs": {F: fetch(issue(224, login="", fio="Сидоренко Олег", tenure=24)),
+               LS: by({"Sydorenko": [person("o.sydorenko", "Oleh", "Sydorenko", created="$AD_CREATED_24"), person("oleh.sydorenko", "Oleh", "Sydorenko", created="$AD_CREATED_25")]})},
+     "counts": {UP: 0, CPROB: 1}, "has": {CPROB: [{"note": "~знайдено кілька акаунтів"}]}},
+    {"name": "латиниця з двох слів: «Ім'я Прізвище»",
+     "stubs": {F: fetch(issue(217, login="", fio="John Smith")), LS: by({"Smith": [person("john.smith", "John", "Smith")]}), GW: by({"Smith": GW204})},
+     "counts": {CLOSE: 1}, "has": {DEC: [{"login": "john.smith"}]}},
+    {"name": "латиниця: порядок «Прізвище Ім'я» в заявці, в AD навпаки: теж знаходимо",
+     "stubs": {F: fetch(issue(218, login="", fio="SMITH JOHN")), LS: by({"John": [person("john.smith", "John", "Smith")]}), GW: by({"John": GW204})},  # ключ заглушки = прізвище першої пари («Smith John» -> John)
+     "counts": {CLOSE: 1}},
+    {"name": "латиниця: людини немає в AD, коментар з варіантами імені",
+     "stubs": {F: fetch(issue(219, login="", fio="NOBODY NOWHERE")), LS: by({})},
+     "counts": {UP: 0, CPROB: 1}, "has": {CPROB: [{"note": "~варіанти латиницею: Nobody Nowhere / Nowhere Nobody"}]}},
+    {"name": "змішані алфавіти в імені (кирилиця + латиниця): ПІБ не розпізнано, коментар",
+     "stubs": {F: fetch(issue(220, login="", fio="Adam Матум"))},
+     "counts": {CMISS: 1, LS: 0}},
     {"name": "за ПІБ лише однофамільці: не знайдено, підказка в коментарі",
      "stubs": {F: fetch(issue(208, login="", fio="Бондар Олена")), LS: by({"Bondar": [person("t.bondar", "Taras", "Bondar")]})},
      "counts": {UP: 0, GW: 0, CPROB: 1}, "has": {CPROB: [{"note": "~З таким прізвищем є: Taras Bondar: t.bondar"}]}},

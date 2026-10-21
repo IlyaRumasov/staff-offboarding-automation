@@ -12,6 +12,7 @@ Redmine і таблиця не викликаються.
 import argparse
 import copy
 import json
+import re
 import sys
 import time
 import urllib.request
@@ -89,6 +90,7 @@ def render(obj):
     t = json.dumps(obj, ensure_ascii=False)
     for k, d in (("$YESTERDAY", -1), ("$TODAY", 0), ("$TOMORROW", 1)):
         t = t.replace(k, (kyiv + timedelta(days=d)).strftime("%Y-%m-%d"))
+    t = re.sub(r'\$AD_CREATED_(\d+)', lambda m: (kyiv + timedelta(days=-1 - int(m.group(1)))).strftime('%Y%m%d') + '120000.0Z', t)
     return json.loads(t)
 
 

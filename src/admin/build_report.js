@@ -14,7 +14,8 @@ const state = $getWorkflowStaticData('global');
 state.notified = state.notified || {};
 const who = c.pairs[0].join(' ');
 const problems = [], pending = [];
-const pat = c.ad.by_login_pattern ? ' (ім’я/прізвище в AD не заповнені, знайдено за шаблоном логіна)' : '';
+const ign = c.ad.ignored_disabled ? ` (інші акаунти з таким іменем уже заблоковані й пропущені: ${c.ad.ignored_disabled})` : '';
+const pat = (c.ad.by_login_pattern ? ' (ім’я/прізвище в AD не заповнені, знайдено за шаблоном логіна)' : '') + ign;
 
 const AD = {
   disabled: () => `Акаунт ${c.ad.login} заблоковано та переміщено в OU «Уволенные».${pat}`,

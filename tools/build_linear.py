@@ -90,7 +90,7 @@ LP = node("Loop Over Tickets", "n8n-nodes-base.splitInBatches", {"options": {}},
 S = node("[AD] Search User", "n8n-nodes-base.ldap", {
     "baseDN": "DC=example,DC=com", "searchFor": "custom",
     "customFilter": "={{ $json.ldap_filter }}",
-    "returnAll": True, "options": {"scope": "sub", "attributes": ["userAccountControl", "sAMAccountName", "givenName", "sn", "displayName", "cn"]}},
+    "returnAll": True, "options": {"scope": "sub", "attributes": ["userAccountControl", "sAMAccountName", "givenName", "sn", "displayName", "cn", "whenCreated"]}},
     1100, 300, alwaysOutputData=True, credentials=LDAP_CRED)
 D = code("Code: Decide AD Action", "decide_ad.js", 1320, 300)
 SW = node("Route by AD Status", "n8n-nodes-base.switch", {

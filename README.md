@@ -3,7 +3,7 @@
 > **English summary.** Two n8n workflows that offboard staff from Redmine tickets: they find the person in Active Directory,
 > Google Workspace and Microsoft 365 **by name** (never by a guessed login), act only on a single unambiguous match, disable access,
 > transfer the Google Drive, and write a report into the ticket (what was checked, the result, what to do next). Anything ambiguous
-> is left to a human with an explanatory comment. No passwords in the flows, 39 + 28 test scenarios, v1 -> v2 history kept in `archive/v1`.
+> is left to a human with an explanatory comment. No passwords in the flows, 50 + 31 test scenarios, v1 -> v2 history kept in `archive/v1`.
 > The rest of this README is in Ukrainian. Licensed under MIT.
 
 
@@ -54,7 +54,7 @@ Google Workspace і Microsoft 365, закривають доступи й пиш
 | Помилки | флоу тихо зупиняється або пише «успішно» | коментар у заявку: що перевірено, результат, що робити далі |
 | Техніка | у звіті завжди «Заборгованості немає» | заявка закривається лише за підтвердженням IT |
 | Повторний запуск | усе прогоняється знову | короткий коментар, дії не повторюються |
-| Тести | немає | 39 і 28 сценаріїв, сухий прогін, жива перевірка на тестовому співробітнику |
+| Тести | немає | 50 і 31 сценарій, сухий прогін, жива перевірка на тестовому співробітнику |
 
 Сама v2 теж пройшла через спрощення: перший переписаний варіант мав 41 і 23 ноди, з багатьма проміжними
 Code-нодами. Після перегляду «склейки» вбудовано в сусідні ноди, розгалуження залишено видимими на схемі
@@ -138,6 +138,15 @@ flowchart TD
 шаблони логіна `ім'я.прізвище`, `і.прізвище`, `ms.і.прізвище`, `ms.ім'я.прізвище`. Акаунт береться, лише якщо
 він один, а ім'я й прізвище в ньому порожні або збігаються. У звіті про це пишеться окремо.
 
+Імена латиницею (в тому числі ЗАГЛАВНИМИ) обробляються так само, як кирилиця. Для імені з трьох і більше слів
+(«ADAM LEOPOLD TESTER») пробуємо й «перше + останнє» («Adam Tester»), бо середнє ім'я в AD часто не записане.
+
+**Лінійний персонал: перевірка за датою створення.** Коли логіна в заявці немає, знайдений за ім'ям акаунт приймається лише
+якщо його дата створення в AD плюс «Загалом днів співпраці» із заявки дорівнюють даті звільнення (допуск 3 дні). На реальних
+заявках збіг був рівно 0 днів, а старі заблоковані дублікати з таким самим ім'ям розходились на 30+ днів. Так відсіюються
+однофамільці й перестановки імені/прізвища. Якщо дата не збігається, акаунт не блокується, а в заявці лишається коментар із
+датами. Якщо терміну в заявці немає, діє правило «активний акаунт один, заблоковані дублікати ігноруються».
+
 ### Лінійний персонал
 
 | Ситуація | Що робить флоу |
@@ -190,7 +199,7 @@ flowchart TD
 
 | Рівень | Що перевіряє | Команда |
 |---|---|---|
-| Заглушки | вся логіка флоу: копія флоу з Cron замість Webhook і заглушками замість Redmine, AD, Google, M365, Sheets. 39 сценаріїв для лінійного, 28 для адмін | `python tests/run_linear_tests.py --url <n8n> --key-file <ключ> [--workflow workflows/admin-offboarding.json --cases tests/cases_admin.json]` |
+| Заглушки | вся логіка флоу: копія флоу з Cron замість Webhook і заглушками замість Redmine, AD, Google, M365, Sheets. 50 сценаріїв для лінійного, 31 для адмін | `python tests/run_linear_tests.py --url <n8n> --key-file <ключ> [--workflow workflows/admin-offboarding.json --cases tests/cases_admin.json]` |
 | Сухий прогін | справжні читання (Redmine, пошук в AD, Google, M365), усі зміни замінені заглушками | `python tests/dry_run_linear.py`, `python tests/dry_run_admin.py` |
 | Тестовий Redmine | заявки вигаданих людей у форматах бойових (`tests/fixtures/test_redmine_tickets.json`, `tools/seed_test_redmine.py`) | `python tests/dry_run_admin.py --redmine-cred <id>` |
 | Реальні дії на тестовому працівнику | `tests/live_test_admin.py`: захист пропускає лише одну заявку й лише одне прізвище | `python tests/live_test_admin.py --ticket <id> --surname <прізвище> ...` |

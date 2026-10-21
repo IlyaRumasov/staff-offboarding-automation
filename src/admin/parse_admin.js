@@ -37,7 +37,12 @@ function namePairs(raw) {
   if (isCyr(a) || isCyr(b)) { if (!isCyr(a) || !isCyr(b)) return []; a = translit(a); b = translit(b); }
   else if (!isLat(a) || !isLat(b)) return [];
   const pairs = [[a, b], [b, a]];
-  return pairs.filter((p, i) => i === 0 || p[0] !== pairs[0][0]);
+  // Латиниця з трьох-чотирьох слів («Adam Leopold Tester»): в AD і Google часто лише «перше + останнє».
+  if (!isCyr(parts[0]) && parts.length >= 3 && parts.length <= 4 && parts.every(isLat)) {
+    const f = parts[0], l = parts[parts.length - 1];
+    pairs.unshift([f, l], [l, f]);
+  }
+  return pairs.filter((p, i, arr) => arr.findIndex(q => q[0] === p[0] && q[1] === p[1]) === i);
 }
 
 function parseDate(issue) {

@@ -11,14 +11,19 @@ const all = $input.all().map(i => i.json).filter(j => j && j.dn);
 const byName = all.filter(j => ctx.pairs.some(([g, s]) => low(j.givenName) === g.toLowerCase() && low(j.sn) === s.toLowerCase()));
 const byLogin = all.filter(j => (ctx.login_variants || []).includes(low(j.sAMAccountName)) &&
   ctx.pairs.some(([g, s]) => (!low(j.givenName) || low(j.givenName) === g.toLowerCase()) && (!low(j.sn) || low(j.sn) === s.toLowerCase())));
-const found = byName.length ? byName : byLogin;
+let found = byName.length ? byName : byLogin;
+// Кілька акаунтів з таким іменем: уже заблоковані дублікати ігноруємо, якщо активний рівно один.
+let ignoredDisabled = [];
+const activeOnly = found.filter(j => !((parseInt(one(j.userAccountControl), 10) || 0) & 2));
+if (found.length > 1 && activeOnly.length === 1) { ignoredDisabled = found.filter(j => j !== activeOnly[0]); found = activeOnly; }
 const where = j => {
   const dn = String(j.dn), uac = parseInt(one(j.userAccountControl), 10) || 0;
   const ou = endsCI(dn, ',' + FIRED_OU) ? 'Уволенные' : (dn.match(/,OU=([^,]+)/) || [])[1] || '?';
   return `${one(j.sAMAccountName)} (${ou}, ${(uac & 2) ? 'заблокований' : 'активний'})`;
 };
 const ad = { status: '', dn: '', target_dn: '', new_uac: '', login: '', candidates: found.map(where).join('; '),
-  by_login_pattern: !byName.length && byLogin.length === 1 };
+  by_login_pattern: !byName.length && byLogin.length === 1,
+  ignored_disabled: ignoredDisabled.map(where).join('; ') };
 if (found.length === 0) ad.status = 'not_found';
 else if (found.length > 1) ad.status = 'multiple';
 else {

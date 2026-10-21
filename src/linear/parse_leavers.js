@@ -46,13 +46,30 @@ const loginVariants = (g, s) => {
 };
 const ldapEsc = s => s.replace(/[\\*()\0]/g, c => '\\' + c.charCodeAt(0).toString(16).padStart(2, '0'));
 
+// Прізвище й ім'я з рядка «ГА - ...» або теми. Повертає пари [ім'я, прізвище] у порядку правдоподібності:
+// кирилиця «Прізвище Ім'я [По батькові]» -> транслітерація; латиниця «Ім'я [Друге] Прізвище» (регістр байдужий).
+// Для імен із трьох і більше латинських слів додатково пробуємо «перше + останнє» (в AD часто без середнього імені).
+const titleCase = w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase();
 function parseName(issue) {
-  // Рядок «ГА - Прізвище Ім'я По батькові» в описі, інакше третій сегмент теми «GA | Leaver | ПІБ | дата».
   const m = (issue.description || '').match(/(?:^|[\s|])ГА[ \t]*[-–—:][ \t]*([^\r\n]*)/);
   const fio = ((m && m[1]) || (issue.subject || '').split('|')[2] || '').trim().replace(/^(ФОП|ФЛП)\s+/i, '');
-  const parts = fio.split(/\s+/).filter(p => /^[А-Яа-яЁёЄєІіЇїҐґ’'ʼ-]+$/.test(p));
-  if (parts.length < 2) return null;
-  return { fio, sn: translit(parts[0]), gn: translit(parts[1]) };
+  const words = fio.split(/\s+/).filter(Boolean);
+  if (words.length < 2) return null;
+  let pairs;
+  if (words.every(w => /^[А-Яа-яЁёЄєІіЇїҐґ’'ʼ-]+$/.test(w))) {
+    const [sn, gn] = [translit(words[0]), translit(words[1])];
+    pairs = [[gn, sn], [sn, gn]];
+  } else if (words.every(w => /^[A-Za-z][A-Za-z’'ʼ.-]*$/.test(w))) {
+    const n = words.map(titleCase), first = n[0], last = n[n.length - 1];
+    pairs = n.length >= 3 ? [[first, last], [last, first], [first, n[1]], [n[1], first]] : [[first, last], [last, first]];
+  } else return null;
+  return { fio, pairs, gn: pairs[0][0], sn: pairs[0][1] };
+}
+
+// «Загалом днів співпраці: 24» із шаблону заявки (потрібно для перевірки акаунта за датою створення).
+function tenureOf(issue) {
+  const m = (issue.description || '').match(/співпраці[ \t]*:[ \t]*(\d+)/i);
+  return m ? Number(m[1]) : null;
 }
 
 function parseLogin(issue) {
@@ -131,10 +148,11 @@ for (const issue of issues) {
   if (L.name) {
     results.push({ json: {
       action: 'process', gw_ok, id, lookup: 'name', login: '', guest_email: '', leaver_date: D.date, subject: issue.subject || '',
-      fio: L.name.fio, sn: L.name.sn, gn: L.name.gn,
-      login_variants: loginVariants(L.name.gn, L.name.sn),
-      ldap_filter: `(&(objectClass=user)(|(sn=${ldapEsc(L.name.sn)})` +
-        loginVariants(L.name.gn, L.name.sn).map(v => `(sAMAccountName=${ldapEsc(v)})`).join('') + '))',
+      fio: L.name.fio, sn: L.name.sn, gn: L.name.gn, pairs: L.name.pairs,
+      tenure_days: tenureOf(issue),
+      login_variants: [...new Set(L.name.pairs.flatMap(([g, sn]) => loginVariants(g, sn)))],
+      ldap_filter: '(&(objectClass=user)(|' + [...new Set(L.name.pairs.map(p => p[1]))].map(sn => `(sn=${ldapEsc(sn)})`).join('') +
+        [...new Set(L.name.pairs.flatMap(([g, sn]) => loginVariants(g, sn)))].map(v => `(sAMAccountName=${ldapEsc(v)})`).join('') + '))',
     } });
     continue;
   }
