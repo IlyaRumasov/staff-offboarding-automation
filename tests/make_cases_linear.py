@@ -54,7 +54,7 @@ cases = [
      "stubs": {F: fetch(issue(50462, login="", fio="Щербак Юлія Петрівна")),
                LS: by({"Shcherbak": [person("y.shcherbak", "Yuliia", "Shcherbak")]}), GW: by({"Shcherbak": GW204})},
      "counts": {CMISS: 0, UP: 1, MV: 1, CLOSE: 1, SHEET: 1},
-     "has": {"Code: Parse Tickets": [{"lookup": "name", "sn": "Shcherbak", "gn": "Yuliia", "ldap_filter": "~(sn=Shcherbak)"}],
+     "has": {"Code: Parse Tickets": [{"lookup": "name", "sn": "Shcherbak", "gn": "Yuliia", "ldap_sn": ["Shcherbak", "Yuliia"] + ["__none__"] * 2, "ldap_sam": "~y.shcherbak"}],
              DEC: [{"login": "y.shcherbak", "found_by_name": True, "guest_email": "y.shcherbak_example.com@tenant.example.org.guest.google"}],
              CLOSE: [{"note": "~знайдено в AD за ПІБ"}], SHEET: [{"login": "y.shcherbak"}]}},
     {"name": "порожній «AD -» і немає ПІБ: коментар", "stubs": {F: fetch(issue(50461, login="", fio=""))},
@@ -239,6 +239,14 @@ cases = [
           "counts": {CPROB: 0, UP: 0, GW: 1}},
          {"stubs": {F: fetch(issue(127, "gw.retry")), LS: by(ldap("gw.retry", f"CN=GwRetry,{FIRED}", "514")), GW: by({"gw.retry": GW204})},
           "counts": {CLOSE: 1}}]},
+    {"name": "слоти фільтра AD: пошук за логіном (один логін, решта слотів порожні)",
+     "stubs": {F: fetch(issue(50470, login="ivan.tester")), LS: by({"ivan.tester": [person("ivan.tester", "Ivan", "Tester")]}), GW: by({"ivan.tester": GW204})},
+     "has": {"Code: Parse Tickets": [{"lookup": "login", "login": "ivan.tester", "ldap_sn": ["__none__"] * 4,
+                                      "ldap_sam": ["ivan.tester"] + ["__none__"] * 15}]}},
+    {"name": "слоти фільтра AD: латинське ім'я з трьох слів дає 4 пари, усі 16 слотів логінів заповнені, без перевищення",
+     "stubs": {F: fetch(issue(50471, login="", fio="Adam Leopold Tester")), LS: by({"Tester": []})},
+     "has": {"Code: Parse Tickets": [{"lookup": "name", "ldap_sn": ["Tester", "Adam", "Leopold", "__none__"],
+                                      "ldap_sam": ['adam.tester', 'a.tester', 'ms.a.tester', 'ms.adam.tester', 'tester.adam', 't.adam', 'ms.t.adam', 'ms.tester.adam', 'adam.leopold', 'a.leopold', 'ms.a.leopold', 'ms.adam.leopold', 'leopold.adam', 'l.adam', 'ms.l.adam', 'ms.leopold.adam']}]}}
 ]
 
 HC = "[Google] Check API Access"

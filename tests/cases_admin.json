@@ -980,7 +980,36 @@
        "Probenko"
       ]
      ],
-     "ldap_filter": "(&(objectClass=user)(|(&(givenName=Probenko)(sn=Olha))(&(givenName=Olha)(sn=Probenko))(sAMAccountName=probenko.olha)(sAMAccountName=p.olha)(sAMAccountName=ms.p.olha)(sAMAccountName=ms.probenko.olha)(sAMAccountName=olha.probenko)(sAMAccountName=o.probenko)(sAMAccountName=ms.o.probenko)(sAMAccountName=ms.olha.probenko)))"
+     "ldap_gn": [
+      "Probenko",
+      "Olha",
+      "__none__",
+      "__none__"
+     ],
+     "ldap_sn": [
+      "Olha",
+      "Probenko",
+      "__none__",
+      "__none__"
+     ],
+     "ldap_sam": [
+      "probenko.olha",
+      "p.olha",
+      "ms.p.olha",
+      "ms.probenko.olha",
+      "olha.probenko",
+      "o.probenko",
+      "ms.o.probenko",
+      "ms.olha.probenko",
+      "__none__",
+      "__none__",
+      "__none__",
+      "__none__",
+      "__none__",
+      "__none__",
+      "__none__",
+      "__none__"
+     ]
     }
    ]
   }

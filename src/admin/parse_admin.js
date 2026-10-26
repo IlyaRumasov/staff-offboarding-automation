@@ -117,13 +117,21 @@ const loginVariants = (g, s) => {
   if (!G || !S) return [];
   return [`${G}.${S}`, `${G[0]}.${S}`, `ms.${G[0]}.${S}`, `ms.${G}.${S}`];
 };
-  const ldapEsc = s => s.replace(/[\\*()\0]/g, c => '\\' + c.charCodeAt(0).toString(16).padStart(2, '0'));
+  // Значення для шаблону фільтра в LDAP-ноді: фіксовані слоти, зайві = NONE (нічого не знаходить).
+  // Нода сама екранує підставлені значення, тому тут лише прибираємо службові символи.
+  const NONE = '__none__';
+  const ldapClean = s => String(s).replace(/[\\*()\0]/g, '');
+  const pad = (values, n) => {
+    if (values.length > n) throw new Error('Забагато значень для фільтра AD, ' + values.length + ' з ' + n);
+    return values.concat(Array(n - values.length).fill(NONE));
+  };
   results.push({ json: {
     action: 'process', id, subject: issue.subject || '', leaver_date: D.date,
     person: eng || ukr, pairs, drive: parseDrive(issue.description, manager === '-' ? '' : manager),
     login_variants: [...new Set(pairs.flatMap(([g, s]) => loginVariants(g, s)))],
-    ldap_filter: '(&(objectClass=user)(|' + pairs.map(([g, s]) => `(&(givenName=${ldapEsc(g)})(sn=${ldapEsc(s)}))`).join('') +
-      [...new Set(pairs.flatMap(([g, s]) => loginVariants(g, s)))].map(v => `(sAMAccountName=${ldapEsc(v)})`).join('') + '))',
+    ldap_gn: pad(pairs.map(p => ldapClean(p[0])), 4),
+    ldap_sn: pad(pairs.map(p => ldapClean(p[1])), 4),
+    ldap_sam: pad([...new Set(pairs.flatMap(([g, s]) => loginVariants(g, s)).map(ldapClean).filter(Boolean))], 16),
   } });
 }
 for (const k of Object.keys(state.notified)) if (!openIds.has(k)) delete state.notified[k];

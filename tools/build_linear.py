@@ -85,11 +85,14 @@ F = node("[Redmine] Get Open Leaver Tickets", REDMINE,
          220, 400, credentials={"redmineApi": {"id": "<REDMINE_CRED>", "name": "Redmine bot account"}})
 P = code("Code: Parse Tickets", "parse_leavers.js", 440, 400)
 R = if_true("Ticket Ready?", "={{ $json.action === 'process' }}", 660, 400)
+# Фільтр дослівним шаблоном із фіксованими слотами: нода екранує підставлені значення, а фільтр цілком із виразу ламається.
+FILTER = ("=(&(objectClass=user)(|" + "".join("(sn={{ $json.ldap_sn[%d] }})" % i for i in range(4))
+          + "".join("(sAMAccountName={{ $json.ldap_sam[%d] }})" % i for i in range(16)) + "))")
 MC = redmine_note("[Redmine] Comment Missing Data", 880, 600)
 LP = node("Loop Over Tickets", "n8n-nodes-base.splitInBatches", {"options": {}}, 880, 300, version=3)
 S = node("[AD] Search User", "n8n-nodes-base.ldap", {
     "baseDN": "DC=example,DC=com", "searchFor": "custom",
-    "customFilter": "={{ $json.ldap_filter }}",
+    "customFilter": FILTER,
     "returnAll": True, "options": {"scope": "sub", "attributes": ["userAccountControl", "sAMAccountName", "givenName", "sn", "displayName", "cn", "whenCreated"]}},
     1100, 300, alwaysOutputData=True, credentials=LDAP_CRED)
 D = code("Code: Decide AD Action", "decide_ad.js", 1320, 300)

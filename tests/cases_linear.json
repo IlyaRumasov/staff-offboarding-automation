@@ -71,7 +71,13 @@
      "lookup": "name",
      "sn": "Shcherbak",
      "gn": "Yuliia",
-     "ldap_filter": "~(sn=Shcherbak)"
+     "ldap_sn": [
+      "Shcherbak",
+      "Yuliia",
+      "__none__",
+      "__none__"
+     ],
+     "ldap_sam": "~y.shcherbak"
     }
    ],
    "Code: Decide AD Action": [
@@ -3598,5 +3604,170 @@
     }
    }
   ]
+ },
+ {
+  "name": "слоти фільтра AD: пошук за логіном (один логін, решта слотів порожні)",
+  "stubs": {
+   "[Redmine] Get Open Leaver Tickets": [
+    {
+     "issues": [
+      {
+       "id": 50470,
+       "tracker": {
+        "id": 41,
+        "name": "GA | Leaver"
+       },
+       "status": {
+        "id": 1,
+        "name": "New"
+       },
+       "subject": "GA | Leaver | Тестовий Користувач Іванович | ",
+       "description": "В системі HRIS створено запит на розірвання договору. \r\n        ГА - Тестовий Користувач Іванович \r\n        AD - ivan.tester \r\n        тел: +380000000470 \r\n        Автор запиту - t.author\r\n        Заборгованості по техніці немає \r\n",
+       "custom_fields": [
+        {
+         "id": 30,
+         "name": "Termination date",
+         "value": "$YESTERDAY"
+        }
+       ]
+      }
+     ],
+     "total_count": 1,
+     "offset": 0,
+     "limit": 100
+    }
+   ],
+   "[AD] Search User": {
+    "__by_login": {
+     "ivan.tester": [
+      {
+       "dn": "CN=Ivan Tester,OU=linear_staff,OU=AllUsers,OU=COMPANY,DC=example,DC=com",
+       "sAMAccountName": "ivan.tester",
+       "givenName": "Ivan",
+       "sn": "Tester",
+       "displayName": "Ivan Tester",
+       "cn": "Ivan Tester",
+       "userAccountControl": "512"
+      }
+     ]
+    }
+   },
+   "[Google] Delete Guest": {
+    "__by_login": {
+     "ivan.tester": {
+      "statusCode": 204,
+      "body": ""
+     }
+    }
+   },
+   "[Google] Check API Access": {
+    "statusCode": 200
+   }
+  },
+  "has": {
+   "Code: Parse Tickets": [
+    {
+     "lookup": "login",
+     "login": "ivan.tester",
+     "ldap_sn": [
+      "__none__",
+      "__none__",
+      "__none__",
+      "__none__"
+     ],
+     "ldap_sam": [
+      "ivan.tester",
+      "__none__",
+      "__none__",
+      "__none__",
+      "__none__",
+      "__none__",
+      "__none__",
+      "__none__",
+      "__none__",
+      "__none__",
+      "__none__",
+      "__none__",
+      "__none__",
+      "__none__",
+      "__none__",
+      "__none__"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "name": "слоти фільтра AD: латинське ім'я з трьох слів дає 4 пари, усі 16 слотів логінів заповнені, без перевищення",
+  "stubs": {
+   "[Redmine] Get Open Leaver Tickets": [
+    {
+     "issues": [
+      {
+       "id": 50471,
+       "tracker": {
+        "id": 41,
+        "name": "GA | Leaver"
+       },
+       "status": {
+        "id": 1,
+        "name": "New"
+       },
+       "subject": "GA | Leaver | Adam Leopold Tester | ",
+       "description": "В системі HRIS створено запит на розірвання договору. \r\n        ГА - Adam Leopold Tester \r\n        AD -  \r\n        тел: +380000000471 \r\n        Автор запиту - t.author\r\n        Заборгованості по техніці немає \r\n",
+       "custom_fields": [
+        {
+         "id": 30,
+         "name": "Termination date",
+         "value": "$YESTERDAY"
+        }
+       ]
+      }
+     ],
+     "total_count": 1,
+     "offset": 0,
+     "limit": 100
+    }
+   ],
+   "[AD] Search User": {
+    "__by_login": {
+     "Tester": []
+    }
+   },
+   "[Google] Check API Access": {
+    "statusCode": 200
+   }
+  },
+  "has": {
+   "Code: Parse Tickets": [
+    {
+     "lookup": "name",
+     "ldap_sn": [
+      "Tester",
+      "Adam",
+      "Leopold",
+      "__none__"
+     ],
+     "ldap_sam": [
+      "adam.tester",
+      "a.tester",
+      "ms.a.tester",
+      "ms.adam.tester",
+      "tester.adam",
+      "t.adam",
+      "ms.t.adam",
+      "ms.tester.adam",
+      "adam.leopold",
+      "a.leopold",
+      "ms.a.leopold",
+      "ms.adam.leopold",
+      "leopold.adam",
+      "l.adam",
+      "ms.l.adam",
+      "ms.leopold.adam"
+     ]
+    }
+   ]
+  }
  }
 ]

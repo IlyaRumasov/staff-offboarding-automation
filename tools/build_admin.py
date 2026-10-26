@@ -97,6 +97,10 @@ node("Every Day 18:00", "n8n-nodes-base.scheduleTrigger",
 node("[Redmine] Get Open Leaver Tickets", REDMINE, {"operation": "getAll", "returnAll": True,
      "filters": {"project_id": "staff-leavers", "tracker_id": "25", "status_id": "open"}, "options": {}}, at(1), Y, credentials=C_REDMINE)
 code("Code: Parse Tickets", "parse_admin.js", None, at(2), Y)
+# Фільтр дослівним шаблоном із фіксованими слотами: нода екранує підставлені значення, а фільтр цілком із виразу ламається.
+_P = "$('Loop Over Tickets').first().json"
+FILTER = ("=(&(objectClass=user)(|" + "".join("(&(givenName={{ %s.ldap_gn[%d] }})(sn={{ %s.ldap_sn[%d] }}))" % (_P, i, _P, i) for i in range(4))
+          + "".join("(sAMAccountName={{ %s.ldap_sam[%d] }})" % (_P, i) for i in range(16)) + "))")
 if_true("Ticket Ready?", "={{ $json.action === 'process' }}", at(3), Y)
 node("[Redmine] Comment Missing Data", REDMINE, {"operation": "update", "issueId": "={{ $json.id }}", "notes": "={{ $json.note }}",
      "additionalFields": {}, "options": {}}, at(4), Y + 260, credentials=C_REDMINE)
@@ -104,7 +108,7 @@ node("Loop Over Tickets", "n8n-nodes-base.splitInBatches", {"options": {}}, at(4
 node("[Redmine] Get Ticket History", REDMINE, {"operation": "get", "issueId": "={{ $json.id }}", "include": ["journals"], "options": {}},
      at(5), Y - 100, credentials=C_REDMINE)
 node("[AD] Search User", "n8n-nodes-base.ldap", {"baseDN": "DC=example,DC=com", "searchFor": "custom",
-     "customFilter": "={{ $('Loop Over Tickets').first().json.ldap_filter }}", "returnAll": True,
+     "customFilter": FILTER, "returnAll": True,
      "options": {"scope": "sub", "attributes": ["userAccountControl", "sAMAccountName", "givenName", "sn", "displayName", "mail", "userPrincipalName"]}},
      at(6), Y - 100, alwaysOutputData=True, credentials=C_LDAP)
 code("Code: Decide AD Action", "decide_ad.js", None, at(7), Y - 100)

@@ -44,7 +44,16 @@ const loginVariants = (g, s) => {
   if (!G || !S) return [];
   return [`${G}.${S}`, `${G[0]}.${S}`, `ms.${G[0]}.${S}`, `ms.${G}.${S}`];
 };
-const ldapEsc = s => s.replace(/[\\*()\0]/g, c => '\\' + c.charCodeAt(0).toString(16).padStart(2, '0'));
+// Значення для шаблону фільтра в LDAP-ноді: фіксовані слоти, зайві = NONE (нічого не знаходить).
+// Нода сама екранує підставлені в шаблон значення (після оновлення n8n фільтр цілком з виразу ламається),
+// тому тут лише прибираємо службові символи.
+const NONE = '__none__';
+const ldapClean = s => String(s).replace(/[\\*()\0]/g, '');
+function slots(values, n) {
+  const u = [...new Set(values.map(ldapClean).filter(Boolean))];
+  if (u.length > n) throw new Error('Забагато значень для фільтра AD, ' + u.length + ' з ' + n);
+  return u.concat(Array(n - u.length).fill(NONE));
+}
 
 // Прізвище й ім'я з рядка «ГА - ...» або теми. Повертає пари [ім'я, прізвище] у порядку правдоподібності:
 // кирилиця «Прізвище Ім'я [По батькові]» -> транслітерація; латиниця «Ім'я [Друге] Прізвище» (регістр байдужий).
@@ -151,8 +160,8 @@ for (const issue of issues) {
       fio: L.name.fio, sn: L.name.sn, gn: L.name.gn, pairs: L.name.pairs,
       tenure_days: tenureOf(issue),
       login_variants: [...new Set(L.name.pairs.flatMap(([g, sn]) => loginVariants(g, sn)))],
-      ldap_filter: '(&(objectClass=user)(|' + [...new Set(L.name.pairs.map(p => p[1]))].map(sn => `(sn=${ldapEsc(sn)})`).join('') +
-        [...new Set(L.name.pairs.flatMap(([g, sn]) => loginVariants(g, sn)))].map(v => `(sAMAccountName=${ldapEsc(v)})`).join('') + '))',
+      ldap_sn: slots(L.name.pairs.map(p => p[1]), 4),
+      ldap_sam: slots(L.name.pairs.flatMap(([g, sn]) => loginVariants(g, sn)), 16),
     } });
     continue;
   }
@@ -161,7 +170,8 @@ for (const issue of issues) {
   const guest = email.endsWith('.guest.google') ? email : `${email.replace('@', '_')}@tenant.example.org.guest.google`;
   results.push({ json: {
     action: 'process', gw_ok, id, lookup: 'login', login: sam, guest_email: guest, leaver_date: D.date, subject: issue.subject || '',
-    ldap_filter: `(&(objectClass=user)(sAMAccountName=${ldapEsc(sam)}))`,
+    ldap_sn: slots([], 4),
+    ldap_sam: slots([sam], 16),
   } });
 }
 
