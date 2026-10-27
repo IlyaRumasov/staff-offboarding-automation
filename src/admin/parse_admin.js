@@ -88,12 +88,15 @@ const fmt = ([checked, result, next]) =>
   `Що робити далі:\n${next.map((s, i) => `${i + 1}. ${s.charAt(0).toUpperCase()}${s.slice(1)}`).join('\n')}\n\n` +
   'Заявку залишено відкритою. Нічого в AD, Google і M365 не змінено. Автоматизація перевіряє заявку щодня о 18:00; про ту саму проблему повторно не пише.';
 
+// Виклик з агента («обробити зараз»): обробляємо лише цю заявку, а пам'ять про коментарі решти не чіпаємо (openIds повний)
+const ONLY = (() => { try { return $('When Called by Agent').isExecuted ? (String($('When Called by Agent').first().json.ticket_id || '') || null) : null; } catch (e) { return null; } })();
 const results = [];
 const openIds = new Set();
 for (const issue of issues) {
   if (!issue || !issue.tracker || issue.tracker.id !== 25) continue;
   const id = issue.id;
   openIds.add(String(id));
+  if (ONLY && String(id) !== ONLY) continue;
   const D = parseDate(issue);
   if (D.date && D.date > today) continue;  // ще не звільнився
 

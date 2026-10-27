@@ -1,0 +1,1484 @@
+[
+ {
+  "name": "лінійний: ноутбук на користувачі -> коментар з переліком",
+  "stubs": {
+   "[Redmine] Get Open Leaver Tickets": [
+    {
+     "issues": [
+      {
+       "id": 501,
+       "tracker": {
+        "id": 41,
+        "name": "GA | Leaver"
+       },
+       "subject": "GA | Leaver | Тестовенко Іван Петрович",
+       "description": "ГА - Тестовенко Іван Петрович\r\nAD - ivan.testovenko\r\nТел: 0000000000",
+       "custom_fields": []
+      }
+     ],
+     "total_count": 1
+    }
+   ],
+   "[GLPI] Find User": {
+    "statusCode": 200,
+    "body": {
+     "totalcount": 1,
+     "data": [
+      {
+       "User.name": "ivan.testovenko",
+       "User.realname": "Testovenko",
+       "User.firstname": "Ivan",
+       "User.id": 10
+      }
+     ]
+    }
+   },
+   "[GLPI] Find Assets": {
+    "statusCode": 200,
+    "body": {
+     "totalcount": 2,
+     "data": [
+      {
+       "AllAssets..name": "Latitude 5490",
+       "AllAssets..serial": "SN0",
+       "AllAssets..otherserial": "2000000000001",
+       "AllAssets..contact": "",
+       "AllAssets.Manufacturer.name": "Dell Inc.",
+       "AllAssets.State.completename": "Работает",
+       "AllAssets.User.name": "ivan.testovenko",
+       "itemtype": "Computer",
+       "id": "100"
+      },
+      {
+       "AllAssets..name": "Dell P2419H",
+       "AllAssets..serial": "SN1",
+       "AllAssets..otherserial": "",
+       "AllAssets..contact": "",
+       "AllAssets.Manufacturer.name": "Dell Inc.",
+       "AllAssets.State.completename": "Работает",
+       "AllAssets.User.name": "ivan.testovenko",
+       "itemtype": "Monitor",
+       "id": "101"
+      }
+     ]
+    }
+   },
+   "[GLPI] Open Session": {
+    "statusCode": 200,
+    "body": {
+     "session_token": "test-session"
+    }
+   },
+   "[Redmine] Get Ticket History": {
+    "issue": {
+     "journals": []
+    }
+   }
+  },
+  "counts": {
+   "[Redmine] Add Comment": 1
+  },
+  "has": {
+   "Code: Parse Tickets": [
+    {
+     "kind": "linear",
+     "login": "ivan.testovenko",
+     "names": [
+      "Тестовенко Іван Петрович"
+     ]
+    }
+   ],
+   "[Redmine] Add Comment": [
+    {
+     "note": "~Перевірка техніки (GLPI): за працівником числиться техніка.\nУ GLPI на користувачі ivan.testovenko:\n– Комп'ютер «Latitude 5490», інв. № 2000000000001, сер. № SN0, Dell Inc., статус: Работает"
+    },
+    {
+     "note": "~– Монітор «Dell P2419H»"
+    }
+   ]
+  }
+ },
+ {
+  "name": "адмін: людина є в GLPI (за ім'ям), нічого немає -> «Заборгованості по техніці немає»",
+  "stubs": {
+   "[Redmine] Get Open Leaver Tickets": [
+    {
+     "issues": [
+      {
+       "id": 502,
+       "tracker": {
+        "id": 25,
+        "name": "Admin | Leaver"
+       },
+       "subject": "Admin Leaver - Ivan Testovenko",
+       "description": "Прошу ...",
+       "custom_fields": [
+        {
+         "id": 11,
+         "name": "Contractor (ENG)",
+         "value": "Ivan Testovenko"
+        },
+        {
+         "id": 103,
+         "name": "Contractor (UKR)",
+         "value": "Тестовенко Іван"
+        }
+       ]
+      }
+     ],
+     "total_count": 1
+    }
+   ],
+   "[GLPI] Find User": {
+    "statusCode": 200,
+    "body": {
+     "totalcount": 1,
+     "data": [
+      {
+       "User.name": "ivan.testovenko",
+       "User.realname": "Testovenko",
+       "User.firstname": "Ivan",
+       "User.id": 10
+      }
+     ]
+    }
+   },
+   "[GLPI] Open Session": {
+    "statusCode": 200,
+    "body": {
+     "session_token": "test-session"
+    }
+   },
+   "[GLPI] Find Assets": {
+    "statusCode": 200,
+    "body": {
+     "totalcount": 0,
+     "data": []
+    }
+   },
+   "[Redmine] Get Ticket History": {
+    "issue": {
+     "journals": []
+    }
+   }
+  },
+  "counts": {
+   "[Redmine] Add Comment": 1
+  },
+  "has": {
+   "Code: Parse Tickets": [
+    {
+     "kind": "admin",
+     "login": ""
+    }
+   ],
+   "[Redmine] Add Comment": [
+    {
+     "note": "Перевірка техніки (GLPI): Заборгованості по техніці немає."
+    }
+   ]
+  }
+ },
+ {
+  "name": "адмін: лише кирилиця в заявці -> транслітерація знаходить користувача GLPI",
+  "stubs": {
+   "[Redmine] Get Open Leaver Tickets": [
+    {
+     "issues": [
+      {
+       "id": 503,
+       "tracker": {
+        "id": 25,
+        "name": "Admin | Leaver"
+       },
+       "subject": "Admin Leaver - ",
+       "description": "Прошу ...",
+       "custom_fields": [
+        {
+         "id": 11,
+         "name": "Contractor (ENG)",
+         "value": ""
+        },
+        {
+         "id": 103,
+         "name": "Contractor (UKR)",
+         "value": "Тестовенко Іван"
+        }
+       ]
+      }
+     ],
+     "total_count": 1
+    }
+   ],
+   "[GLPI] Find User": {
+    "statusCode": 200,
+    "body": {
+     "totalcount": 1,
+     "data": [
+      {
+       "User.name": "ivan.testovenko",
+       "User.realname": "Testovenko",
+       "User.firstname": "Ivan",
+       "User.id": 10
+      }
+     ]
+    }
+   },
+   "[GLPI] Open Session": {
+    "statusCode": 200,
+    "body": {
+     "session_token": "test-session"
+    }
+   },
+   "[GLPI] Find Assets": {
+    "statusCode": 200,
+    "body": {
+     "totalcount": 0,
+     "data": []
+    }
+   },
+   "[Redmine] Get Ticket History": {
+    "issue": {
+     "journals": []
+    }
+   }
+  },
+  "has": {
+   "Code: Parse Tickets": [
+    {
+     "names": [
+      "Тестовенко Іван"
+     ],
+     "user_url": "~%5Etestovenko%24"
+    }
+   ],
+   "[Redmine] Add Comment": [
+    {
+     "note": "Перевірка техніки (GLPI): Заборгованості по техніці немає."
+    }
+   ]
+  }
+ },
+ {
+  "name": "адмін: людини в GLPI немає -> потрібна перевірка IT (не «немає»)",
+  "stubs": {
+   "[Redmine] Get Open Leaver Tickets": [
+    {
+     "issues": [
+      {
+       "id": 504,
+       "tracker": {
+        "id": 25,
+        "name": "Admin | Leaver"
+       },
+       "subject": "Admin Leaver - Ivan Testovenko",
+       "description": "Прошу ...",
+       "custom_fields": [
+        {
+         "id": 11,
+         "name": "Contractor (ENG)",
+         "value": "Ivan Testovenko"
+        },
+        {
+         "id": 103,
+         "name": "Contractor (UKR)",
+         "value": "Тестовенко Іван"
+        }
+       ]
+      }
+     ],
+     "total_count": 1
+    }
+   ],
+   "[GLPI] Open Session": {
+    "statusCode": 200,
+    "body": {
+     "session_token": "test-session"
+    }
+   },
+   "[GLPI] Find User": {
+    "statusCode": 200,
+    "body": {
+     "totalcount": 0,
+     "data": []
+    }
+   },
+   "[GLPI] Find Assets": {
+    "statusCode": 200,
+    "body": {
+     "totalcount": 0,
+     "data": []
+    }
+   },
+   "[Redmine] Get Ticket History": {
+    "issue": {
+     "journals": []
+    }
+   }
+  },
+  "has": {
+   "[Redmine] Add Comment": [
+    {
+     "note": "~Перевірка техніки (GLPI): потрібна перевірка IT.\nПрацівника «Ivan Testovenko» у GLPI не знайдено"
+    }
+   ]
+  }
+ },
+ {
+  "name": "лінійний: людини в GLPI немає -> «Заборгованості по техніці немає»",
+  "stubs": {
+   "[Redmine] Get Open Leaver Tickets": [
+    {
+     "issues": [
+      {
+       "id": 520,
+       "tracker": {
+        "id": 41,
+        "name": "GA | Leaver"
+       },
+       "subject": "GA | Leaver | Тестовенко Іван Петрович",
+       "description": "ГА - Тестовенко Іван Петрович\r\nAD - ivan.testovenko\r\nТел: 0000000000",
+       "custom_fields": []
+      }
+     ],
+     "total_count": 1
+    }
+   ],
+   "[GLPI] Open Session": {
+    "statusCode": 200,
+    "body": {
+     "session_token": "test-session"
+    }
+   },
+   "[GLPI] Find User": {
+    "statusCode": 200,
+    "body": {
+     "totalcount": 0,
+     "data": []
+    }
+   },
+   "[GLPI] Find Assets": {
+    "statusCode": 200,
+    "body": {
+     "totalcount": 0,
+     "data": []
+    }
+   },
+   "[Redmine] Get Ticket History": {
+    "issue": {
+     "journals": []
+    }
+   }
+  },
+  "counts": {
+   "[Redmine] Add Comment": 1
+  },
+  "has": {
+   "[Redmine] Add Comment": [
+    {
+     "note": "Перевірка техніки (GLPI): Заборгованості по техніці немає."
+    }
+   ]
+  }
+ },
+ {
+  "name": "лінійний: є в GLPI, нічого немає -> «Заборгованості по техніці немає»",
+  "stubs": {
+   "[Redmine] Get Open Leaver Tickets": [
+    {
+     "issues": [
+      {
+       "id": 521,
+       "tracker": {
+        "id": 41,
+        "name": "GA | Leaver"
+       },
+       "subject": "GA | Leaver | Тестовенко Іван Петрович",
+       "description": "ГА - Тестовенко Іван Петрович\r\nAD - ivan.testovenko\r\nТел: 0000000000",
+       "custom_fields": []
+      }
+     ],
+     "total_count": 1
+    }
+   ],
+   "[GLPI] Find User": {
+    "statusCode": 200,
+    "body": {
+     "totalcount": 1,
+     "data": [
+      {
+       "User.name": "ivan.testovenko",
+       "User.realname": "Testovenko",
+       "User.firstname": "Ivan",
+       "User.id": 10
+      }
+     ]
+    }
+   },
+   "[GLPI] Open Session": {
+    "statusCode": 200,
+    "body": {
+     "session_token": "test-session"
+    }
+   },
+   "[GLPI] Find Assets": {
+    "statusCode": 200,
+    "body": {
+     "totalcount": 0,
+     "data": []
+    }
+   },
+   "[Redmine] Get Ticket History": {
+    "issue": {
+     "journals": []
+    }
+   }
+  },
+  "counts": {
+   "[Redmine] Add Comment": 1
+  },
+  "has": {
+   "[Redmine] Add Comment": [
+    {
+     "note": "Перевірка техніки (GLPI): Заборгованості по техніці немає."
+    }
+   ]
+  }
+ },
+ {
+  "name": "лінійний: немає в GLPI, але «Контакт» з ПІБ -> перевірка IT, не «немає»",
+  "stubs": {
+   "[Redmine] Get Open Leaver Tickets": [
+    {
+     "issues": [
+      {
+       "id": 524,
+       "tracker": {
+        "id": 41,
+        "name": "GA | Leaver"
+       },
+       "subject": "GA | Leaver | Тестовенко Іван Петрович",
+       "description": "ГА - Тестовенко Іван Петрович\r\nAD - ivan.testovenko\r\nТел: 0000000000",
+       "custom_fields": []
+      }
+     ],
+     "total_count": 1
+    }
+   ],
+   "[GLPI] Find Assets": {
+    "statusCode": 200,
+    "body": {
+     "totalcount": 1,
+     "data": [
+      {
+       "AllAssets..name": "PC-17",
+       "AllAssets..serial": "SN0",
+       "AllAssets..otherserial": "",
+       "AllAssets..contact": "ivan.testovenko@PC-17",
+       "AllAssets.Manufacturer.name": "Dell Inc.",
+       "AllAssets.State.completename": "Работает",
+       "AllAssets.User.name": "",
+       "itemtype": "Computer",
+       "id": "100"
+      }
+     ]
+    }
+   },
+   "[GLPI] Open Session": {
+    "statusCode": 200,
+    "body": {
+     "session_token": "test-session"
+    }
+   },
+   "[GLPI] Find User": {
+    "statusCode": 200,
+    "body": {
+     "totalcount": 0,
+     "data": []
+    }
+   },
+   "[Redmine] Get Ticket History": {
+    "issue": {
+     "journals": []
+    }
+   }
+  },
+  "has": {
+   "Code: Build Comment": [
+    {
+     "status": "not_in_glpi"
+    }
+   ],
+   "[Redmine] Add Comment": [
+    {
+     "note": "~Перевірка техніки (GLPI): потрібна перевірка IT."
+    },
+    {
+     "note": "~PC-17"
+    }
+   ]
+  }
+ },
+ {
+  "name": "лінійний: раніше числилась техніка, тепер немає -> пишемо «немає»",
+  "stubs": {
+   "[Redmine] Get Open Leaver Tickets": [
+    {
+     "issues": [
+      {
+       "id": 522,
+       "tracker": {
+        "id": 41,
+        "name": "GA | Leaver"
+       },
+       "subject": "GA | Leaver | Тестовенко Іван Петрович",
+       "description": "ГА - Тестовенко Іван Петрович\r\nAD - ivan.testovenko\r\nТел: 0000000000",
+       "custom_fields": []
+      }
+     ],
+     "total_count": 1
+    }
+   ],
+   "[GLPI] Find User": {
+    "statusCode": 200,
+    "body": {
+     "totalcount": 1,
+     "data": [
+      {
+       "User.name": "ivan.testovenko",
+       "User.realname": "Testovenko",
+       "User.firstname": "Ivan",
+       "User.id": 10
+      }
+     ]
+    }
+   },
+   "[Redmine] Get Ticket History": {
+    "__by_ticket": {
+     "522": {
+      "issue": {
+       "journals": [
+        {
+         "id": 0,
+         "notes": "Перевірка техніки (GLPI): за працівником числиться техніка.\nУ GLPI ..."
+        }
+       ]
+      }
+     }
+    }
+   },
+   "[GLPI] Open Session": {
+    "statusCode": 200,
+    "body": {
+     "session_token": "test-session"
+    }
+   },
+   "[GLPI] Find Assets": {
+    "statusCode": 200,
+    "body": {
+     "totalcount": 0,
+     "data": []
+    }
+   }
+  },
+  "counts": {
+   "[Redmine] Add Comment": 1
+  },
+  "has": {
+   "[Redmine] Add Comment": [
+    {
+     "note": "Перевірка техніки (GLPI): Заборгованості по техніці немає."
+    }
+   ]
+  }
+ },
+ {
+  "name": "лінійний: GLPI недоступний -> мовчимо (не скасовуємо попередній висновок)",
+  "stubs": {
+   "[Redmine] Get Open Leaver Tickets": [
+    {
+     "issues": [
+      {
+       "id": 523,
+       "tracker": {
+        "id": 41,
+        "name": "GA | Leaver"
+       },
+       "subject": "GA | Leaver | Тестовенко Іван Петрович",
+       "description": "ГА - Тестовенко Іван Петрович\r\nAD - ivan.testovenko\r\nТел: 0000000000",
+       "custom_fields": []
+      }
+     ],
+     "total_count": 1
+    }
+   ],
+   "[GLPI] Open Session": {
+    "statusCode": 500,
+    "body": ""
+   },
+   "[Redmine] Get Ticket History": {
+    "__by_ticket": {
+     "523": {
+      "issue": {
+       "journals": [
+        {
+         "id": 0,
+         "notes": "Перевірка техніки (GLPI): за працівником числиться техніка.\nУ GLPI ..."
+        }
+       ]
+      }
+     }
+    }
+   },
+   "[GLPI] Find User": {
+    "statusCode": 200,
+    "body": {
+     "totalcount": 0,
+     "data": []
+    }
+   },
+   "[GLPI] Find Assets": {
+    "statusCode": 200,
+    "body": {
+     "totalcount": 0,
+     "data": []
+    }
+   }
+  },
+  "counts": {
+   "[Redmine] Add Comment": 0
+  },
+  "has": {
+   "Code: Build Comment": [
+    {
+     "status": "error"
+    }
+   ]
+  }
+ },
+ {
+  "name": "схожий логін у GLPI (ivan.testovenkova) -> не той користувач",
+  "stubs": {
+   "[Redmine] Get Open Leaver Tickets": [
+    {
+     "issues": [
+      {
+       "id": 505,
+       "tracker": {
+        "id": 41,
+        "name": "GA | Leaver"
+       },
+       "subject": "GA | Leaver | Тестовенко Іван Петрович",
+       "description": "ГА - Тестовенко Іван Петрович\r\nAD - ivan.testovenko\r\nТел: 0000000000",
+       "custom_fields": []
+      }
+     ],
+     "total_count": 1
+    }
+   ],
+   "[GLPI] Find User": {
+    "statusCode": 200,
+    "body": {
+     "totalcount": 1,
+     "data": [
+      {
+       "User.name": "ivan.testovenkova",
+       "User.realname": "Testovenkova",
+       "User.firstname": "Ivanna",
+       "User.id": 10
+      }
+     ]
+    }
+   },
+   "[GLPI] Find Assets": {
+    "statusCode": 200,
+    "body": {
+     "totalcount": 1,
+     "data": [
+      {
+       "AllAssets..name": "Other",
+       "AllAssets..serial": "SN0",
+       "AllAssets..otherserial": "1",
+       "AllAssets..contact": "",
+       "AllAssets.Manufacturer.name": "Dell Inc.",
+       "AllAssets.State.completename": "Работает",
+       "AllAssets.User.name": "ivan.testovenkova",
+       "itemtype": "Computer",
+       "id": "100"
+      }
+     ]
+    }
+   },
+   "[GLPI] Open Session": {
+    "statusCode": 200,
+    "body": {
+     "session_token": "test-session"
+    }
+   },
+   "[Redmine] Get Ticket History": {
+    "issue": {
+     "journals": []
+    }
+   }
+  },
+  "has": {
+   "Code: Build Comment": [
+    {
+     "status": "not_in_glpi"
+    }
+   ]
+  }
+ },
+ {
+  "name": "нічого не числиться, але «Контакт» з ПІБ кирилицею -> перевірка IT з переліком",
+  "stubs": {
+   "[Redmine] Get Open Leaver Tickets": [
+    {
+     "issues": [
+      {
+       "id": 506,
+       "tracker": {
+        "id": 41,
+        "name": "GA | Leaver"
+       },
+       "subject": "GA | Leaver | Тестовенко Іван Петрович",
+       "description": "ГА - Тестовенко Іван Петрович\r\nAD - ivan.testovenko\r\nТел: 0000000000",
+       "custom_fields": []
+      }
+     ],
+     "total_count": 1
+    }
+   ],
+   "[GLPI] Find User": {
+    "statusCode": 200,
+    "body": {
+     "totalcount": 1,
+     "data": [
+      {
+       "User.name": "ivan.testovenko",
+       "User.realname": "Testovenko",
+       "User.firstname": "Ivan",
+       "User.id": 10
+      }
+     ]
+    }
+   },
+   "[GLPI] Find Assets": {
+    "statusCode": 200,
+    "body": {
+     "totalcount": 1,
+     "data": [
+      {
+       "AllAssets..name": "Headset",
+       "AllAssets..serial": "SN0",
+       "AllAssets..otherserial": "",
+       "AllAssets..contact": "Тестовенко Іван",
+       "AllAssets.Manufacturer.name": "Dell Inc.",
+       "AllAssets.State.completename": "Работает",
+       "AllAssets.User.name": "",
+       "itemtype": "Peripheral",
+       "id": "100"
+      }
+     ]
+    }
+   },
+   "[GLPI] Open Session": {
+    "statusCode": 200,
+    "body": {
+     "session_token": "test-session"
+    }
+   },
+   "[Redmine] Get Ticket History": {
+    "issue": {
+     "journals": []
+    }
+   }
+  },
+  "has": {
+   "Code: Build Comment": [
+    {
+     "status": "check"
+    }
+   ],
+   "[Redmine] Add Comment": [
+    {
+     "note": "~У полі «Контакт» GLPI згадується «ivan.testovenko»"
+    },
+    {
+     "note": "~Headset"
+    }
+   ]
+  }
+ },
+ {
+  "name": "той самий висновок уже в заявці -> мовчимо",
+  "stubs": {
+   "[Redmine] Get Open Leaver Tickets": [
+    {
+     "issues": [
+      {
+       "id": 507,
+       "tracker": {
+        "id": 25,
+        "name": "Admin | Leaver"
+       },
+       "subject": "Admin Leaver - Ivan Testovenko",
+       "description": "Прошу ...",
+       "custom_fields": [
+        {
+         "id": 11,
+         "name": "Contractor (ENG)",
+         "value": "Ivan Testovenko"
+        },
+        {
+         "id": 103,
+         "name": "Contractor (UKR)",
+         "value": "Тестовенко Іван"
+        }
+       ]
+      }
+     ],
+     "total_count": 1
+    }
+   ],
+   "[GLPI] Find User": {
+    "statusCode": 200,
+    "body": {
+     "totalcount": 1,
+     "data": [
+      {
+       "User.name": "ivan.testovenko",
+       "User.realname": "Testovenko",
+       "User.firstname": "Ivan",
+       "User.id": 10
+      }
+     ]
+    }
+   },
+   "[Redmine] Get Ticket History": {
+    "__by_ticket": {
+     "507": {
+      "issue": {
+       "journals": [
+        {
+         "id": 0,
+         "notes": "Перевірка техніки (GLPI): Заборгованості по техніці немає."
+        }
+       ]
+      }
+     }
+    }
+   },
+   "[GLPI] Open Session": {
+    "statusCode": 200,
+    "body": {
+     "session_token": "test-session"
+    }
+   },
+   "[GLPI] Find Assets": {
+    "statusCode": 200,
+    "body": {
+     "totalcount": 0,
+     "data": []
+    }
+   }
+  },
+  "counts": {
+   "[Redmine] Add Comment": 0
+  },
+  "has": {
+   "Code: Build Comment": [
+    {
+     "notify": false
+    }
+   ]
+  }
+ },
+ {
+  "name": "висновок змінився (раніше числилась техніка, тепер немає) -> новий коментар",
+  "stubs": {
+   "[Redmine] Get Open Leaver Tickets": [
+    {
+     "issues": [
+      {
+       "id": 508,
+       "tracker": {
+        "id": 25,
+        "name": "Admin | Leaver"
+       },
+       "subject": "Admin Leaver - Ivan Testovenko",
+       "description": "Прошу ...",
+       "custom_fields": [
+        {
+         "id": 11,
+         "name": "Contractor (ENG)",
+         "value": "Ivan Testovenko"
+        },
+        {
+         "id": 103,
+         "name": "Contractor (UKR)",
+         "value": "Тестовенко Іван"
+        }
+       ]
+      }
+     ],
+     "total_count": 1
+    }
+   ],
+   "[GLPI] Find User": {
+    "statusCode": 200,
+    "body": {
+     "totalcount": 1,
+     "data": [
+      {
+       "User.name": "ivan.testovenko",
+       "User.realname": "Testovenko",
+       "User.firstname": "Ivan",
+       "User.id": 10
+      }
+     ]
+    }
+   },
+   "[Redmine] Get Ticket History": {
+    "__by_ticket": {
+     "508": {
+      "issue": {
+       "journals": [
+        {
+         "id": 0,
+         "notes": "Перевірка техніки (GLPI): за працівником числиться техніка.\nУ GLPI ..."
+        }
+       ]
+      }
+     }
+    }
+   },
+   "[GLPI] Open Session": {
+    "statusCode": 200,
+    "body": {
+     "session_token": "test-session"
+    }
+   },
+   "[GLPI] Find Assets": {
+    "statusCode": 200,
+    "body": {
+     "totalcount": 0,
+     "data": []
+    }
+   }
+  },
+  "counts": {
+   "[Redmine] Add Comment": 1
+  },
+  "has": {
+   "[Redmine] Add Comment": [
+    {
+     "note": "Перевірка техніки (GLPI): Заборгованості по техніці немає."
+    }
+   ]
+  }
+ },
+ {
+  "name": "останнє слово про техніку за IT («закріплений ноутбук») -> мовчимо",
+  "stubs": {
+   "[Redmine] Get Open Leaver Tickets": [
+    {
+     "issues": [
+      {
+       "id": 509,
+       "tracker": {
+        "id": 25,
+        "name": "Admin | Leaver"
+       },
+       "subject": "Admin Leaver - Ivan Testovenko",
+       "description": "Прошу ...",
+       "custom_fields": [
+        {
+         "id": 11,
+         "name": "Contractor (ENG)",
+         "value": "Ivan Testovenko"
+        },
+        {
+         "id": 103,
+         "name": "Contractor (UKR)",
+         "value": "Тестовенко Іван"
+        }
+       ]
+      }
+     ],
+     "total_count": 1
+    }
+   ],
+   "[GLPI] Find User": {
+    "statusCode": 200,
+    "body": {
+     "totalcount": 1,
+     "data": [
+      {
+       "User.name": "ivan.testovenko",
+       "User.realname": "Testovenko",
+       "User.firstname": "Ivan",
+       "User.id": 10
+      }
+     ]
+    }
+   },
+   "[Redmine] Get Ticket History": {
+    "__by_ticket": {
+     "509": {
+      "issue": {
+       "journals": [
+        {
+         "id": 0,
+         "notes": "За Іваном закріплений ноутбук 2000000000001"
+        }
+       ]
+      }
+     }
+    }
+   },
+   "[GLPI] Open Session": {
+    "statusCode": 200,
+    "body": {
+     "session_token": "test-session"
+    }
+   },
+   "[GLPI] Find Assets": {
+    "statusCode": 200,
+    "body": {
+     "totalcount": 0,
+     "data": []
+    }
+   }
+  },
+  "counts": {
+   "[Redmine] Add Comment": 0
+  },
+  "has": {
+   "Code: Build Comment": [
+    {
+     "human_decided": true
+    }
+   ]
+  }
+ },
+ {
+  "name": "звіт offboarding («Автоматичний offboarding ... заборгованості немає») не рахуємо як рішення людини",
+  "stubs": {
+   "[Redmine] Get Open Leaver Tickets": [
+    {
+     "issues": [
+      {
+       "id": 510,
+       "tracker": {
+        "id": 25,
+        "name": "Admin | Leaver"
+       },
+       "subject": "Admin Leaver - Ivan Testovenko",
+       "description": "Прошу ...",
+       "custom_fields": [
+        {
+         "id": 11,
+         "name": "Contractor (ENG)",
+         "value": "Ivan Testovenko"
+        },
+        {
+         "id": 103,
+         "name": "Contractor (UKR)",
+         "value": "Тестовенко Іван"
+        }
+       ]
+      }
+     ],
+     "total_count": 1
+    }
+   ],
+   "[GLPI] Find User": {
+    "statusCode": 200,
+    "body": {
+     "totalcount": 1,
+     "data": [
+      {
+       "User.name": "ivan.testovenko",
+       "User.realname": "Testovenko",
+       "User.firstname": "Ivan",
+       "User.id": 10
+      }
+     ]
+    }
+   },
+   "[Redmine] Get Ticket History": {
+    "__by_ticket": {
+     "510": {
+      "issue": {
+       "journals": [
+        {
+         "id": 0,
+         "notes": "Автоматичний offboarding: ... IT підтвердив, що заборгованості по техніці немає."
+        }
+       ]
+      }
+     }
+    }
+   },
+   "[GLPI] Open Session": {
+    "statusCode": 200,
+    "body": {
+     "session_token": "test-session"
+    }
+   },
+   "[GLPI] Find Assets": {
+    "statusCode": 200,
+    "body": {
+     "totalcount": 0,
+     "data": []
+    }
+   }
+  },
+  "counts": {
+   "[Redmine] Add Comment": 1
+  }
+ },
+ {
+  "name": "Starter і без імені/логіна пропускаємо; лінійна заявка обробляється",
+  "stubs": {
+   "[Redmine] Get Open Leaver Tickets": [
+    {
+     "issues": [
+      {
+       "id": 511,
+       "tracker": {
+        "id": 21,
+        "name": "GA | Leaver"
+       },
+       "subject": "GA | Leaver | Тестовенко Іван Петрович",
+       "description": "ГА - Тестовенко Іван Петрович\r\nAD - ivan.testovenko\r\nТел: 0000000000",
+       "custom_fields": []
+      },
+      {
+       "id": 512,
+       "tracker": {
+        "id": 41,
+        "name": "GA | Leaver"
+       },
+       "subject": "GA | Leaver | ",
+       "description": "ГА - \r\nAD - \r\nТел: 0000000000",
+       "custom_fields": []
+      },
+      {
+       "id": 513,
+       "tracker": {
+        "id": 41,
+        "name": "GA | Leaver"
+       },
+       "subject": "GA | Leaver | Тестовенко Іван Петрович",
+       "description": "ГА - Тестовенко Іван Петрович\r\nAD - ivan.testovenko\r\nТел: 0000000000",
+       "custom_fields": []
+      }
+     ],
+     "total_count": 3
+    }
+   ],
+   "[GLPI] Find User": {
+    "statusCode": 200,
+    "body": {
+     "totalcount": 1,
+     "data": [
+      {
+       "User.name": "ivan.testovenko",
+       "User.realname": "Testovenko",
+       "User.firstname": "Ivan",
+       "User.id": 10
+      }
+     ]
+    }
+   },
+   "[GLPI] Open Session": {
+    "statusCode": 200,
+    "body": {
+     "session_token": "test-session"
+    }
+   },
+   "[GLPI] Find Assets": {
+    "statusCode": 200,
+    "body": {
+     "totalcount": 0,
+     "data": []
+    }
+   },
+   "[Redmine] Get Ticket History": {
+    "issue": {
+     "journals": []
+    }
+   }
+  },
+  "counts": {
+   "Code: Parse Tickets": 1
+  },
+  "has": {
+   "Code: Parse Tickets": [
+    {
+     "id": 513
+    }
+   ],
+   "Code: Build Comment": [
+    {
+     "id": 513
+    }
+   ]
+  }
+ },
+ {
+  "name": "адмін: GLPI недоступний -> коментар про помилку один раз",
+  "steps": [
+   {
+    "stubs": {
+     "[Redmine] Get Open Leaver Tickets": [
+      {
+       "issues": [
+        {
+         "id": 514,
+         "tracker": {
+          "id": 25,
+          "name": "Admin | Leaver"
+         },
+         "subject": "Admin Leaver - Ivan Testovenko",
+         "description": "Прошу ...",
+         "custom_fields": [
+          {
+           "id": 11,
+           "name": "Contractor (ENG)",
+           "value": "Ivan Testovenko"
+          },
+          {
+           "id": 103,
+           "name": "Contractor (UKR)",
+           "value": "Тестовенко Іван"
+          }
+         ]
+        }
+       ],
+       "total_count": 1
+      }
+     ],
+     "[GLPI] Open Session": {
+      "statusCode": 400,
+      "body": [
+       "ERROR_WRONG_APP_TOKEN_PARAMETER",
+       "x"
+      ]
+     },
+     "[GLPI] Find User": {
+      "statusCode": 200,
+      "body": {
+       "totalcount": 0,
+       "data": []
+      }
+     },
+     "[GLPI] Find Assets": {
+      "statusCode": 200,
+      "body": {
+       "totalcount": 0,
+       "data": []
+      }
+     },
+     "[Redmine] Get Ticket History": {
+      "issue": {
+       "journals": []
+      }
+     }
+    },
+    "has": {
+     "[Redmine] Add Comment": [
+      {
+       "note": "~Перевірка техніки (GLPI): перевірити GLPI не вдалося (вхід у GLPI 400"
+      }
+     ]
+    }
+   },
+   {
+    "stubs": {
+     "[Redmine] Get Open Leaver Tickets": [
+      {
+       "issues": [
+        {
+         "id": 514,
+         "tracker": {
+          "id": 25,
+          "name": "Admin | Leaver"
+         },
+         "subject": "Admin Leaver - Ivan Testovenko",
+         "description": "Прошу ...",
+         "custom_fields": [
+          {
+           "id": 11,
+           "name": "Contractor (ENG)",
+           "value": "Ivan Testovenko"
+          },
+          {
+           "id": 103,
+           "name": "Contractor (UKR)",
+           "value": "Тестовенко Іван"
+          }
+         ]
+        }
+       ],
+       "total_count": 1
+      }
+     ],
+     "[GLPI] Open Session": {
+      "statusCode": 400,
+      "body": [
+       "ERROR_WRONG_APP_TOKEN_PARAMETER",
+       "x"
+      ]
+     },
+     "[Redmine] Get Ticket History": {
+      "__by_ticket": {
+       "514": {
+        "issue": {
+         "journals": [
+          {
+           "id": 0,
+           "notes": "Перевірка техніки (GLPI): перевірити GLPI не вдалося (вхід у GLPI 400: [\"ERROR_WRONG_APP_TOKEN_PARAMETER\",\"x\"]). Перевірка повториться щогодини."
+          }
+         ]
+        }
+       }
+      }
+     },
+     "[GLPI] Find User": {
+      "statusCode": 200,
+      "body": {
+       "totalcount": 0,
+       "data": []
+      }
+     },
+     "[GLPI] Find Assets": {
+      "statusCode": 200,
+      "body": {
+       "totalcount": 0,
+       "data": []
+      }
+     }
+    },
+    "counts": {
+     "[Redmine] Add Comment": 0
+    }
+   }
+  ]
+ },
+ {
+  "name": "дві заявки: різні висновки",
+  "stubs": {
+   "[Redmine] Get Open Leaver Tickets": [
+    {
+     "issues": [
+      {
+       "id": 515,
+       "tracker": {
+        "id": 41,
+        "name": "GA | Leaver"
+       },
+       "subject": "GA | Leaver | Тестовенко Іван Петрович",
+       "description": "ГА - Тестовенко Іван Петрович\r\nAD - ivan.testovenko\r\nТел: 0000000000",
+       "custom_fields": []
+      },
+      {
+       "id": 516,
+       "tracker": {
+        "id": 41,
+        "name": "GA | Leaver"
+       },
+       "subject": "GA | Leaver | Пробний Петро",
+       "description": "ГА - Пробний Петро\r\nAD - petro.probnyi\r\nТел: 0000000000",
+       "custom_fields": []
+      }
+     ],
+     "total_count": 2
+    }
+   ],
+   "[GLPI] Find User": {
+    "__by_ticket": {
+     "515": {
+      "statusCode": 200,
+      "body": {
+       "totalcount": 1,
+       "data": [
+        {
+         "User.name": "ivan.testovenko",
+         "User.realname": "Testovenko",
+         "User.firstname": "Ivan",
+         "User.id": 10
+        }
+       ]
+      }
+     },
+     "516": {
+      "statusCode": 200,
+      "body": {
+       "totalcount": 0,
+       "data": []
+      }
+     }
+    }
+   },
+   "[GLPI] Find Assets": {
+    "__by_ticket": {
+     "515": {
+      "statusCode": 200,
+      "body": {
+       "totalcount": 1,
+       "data": [
+        {
+         "AllAssets..name": "Latitude 5490",
+         "AllAssets..serial": "SN0",
+         "AllAssets..otherserial": "2000000000001",
+         "AllAssets..contact": "",
+         "AllAssets.Manufacturer.name": "Dell Inc.",
+         "AllAssets.State.completename": "Работает",
+         "AllAssets.User.name": "ivan.testovenko",
+         "itemtype": "Computer",
+         "id": "100"
+        }
+       ]
+      }
+     },
+     "516": {
+      "statusCode": 200,
+      "body": {
+       "totalcount": 0,
+       "data": []
+      }
+     }
+    }
+   },
+   "[GLPI] Open Session": {
+    "statusCode": 200,
+    "body": {
+     "session_token": "test-session"
+    }
+   },
+   "[Redmine] Get Ticket History": {
+    "issue": {
+     "journals": []
+    }
+   }
+  },
+  "counts": {
+   "[Redmine] Add Comment": 2
+  },
+  "has": {
+   "[Redmine] Add Comment": [
+    {
+     "id": 515,
+     "note": "~числиться техніка"
+    },
+    {
+     "id": 516,
+     "note": "~Заборгованості по техніці немає."
+    }
+   ]
+  }
+ }
+]

@@ -3769,5 +3769,471 @@
     }
    ]
   }
+ },
+ {
+  "name": "техніка (коментар перевірки GLPI): AD і гість закриті, заявка відкрита, наступного дня мовчимо, після «немає» закрито",
+  "steps": [
+   {
+    "stubs": {
+     "[Redmine] Get Open Leaver Tickets": [
+      {
+       "issues": [
+        {
+         "id": 50480,
+         "tracker": {
+          "id": 41,
+          "name": "GA | Leaver"
+         },
+         "status": {
+          "id": 1,
+          "name": "New"
+         },
+         "subject": "GA | Leaver | Тестовий Користувач Іванович | ",
+         "description": "В системі HRIS створено запит на розірвання договору. \r\n        ГА - Тестовий Користувач Іванович \r\n        AD - glpi.tester \r\n        тел: +380000000480 \r\n        Автор запиту - t.author\r\n        Заборгованості по техніці немає \r\n",
+         "custom_fields": [
+          {
+           "id": 30,
+           "name": "Termination date",
+           "value": "$YESTERDAY"
+          }
+         ]
+        }
+       ],
+       "total_count": 1,
+       "offset": 0,
+       "limit": 100
+      }
+     ],
+     "[AD] Search User": {
+      "__by_login": {
+       "glpi.tester": [
+        {
+         "dn": "CN=Glpi Tester,OU=linear_staff,OU=AllUsers,OU=COMPANY,DC=example,DC=com",
+         "sAMAccountName": "glpi.tester",
+         "givenName": "Glpi",
+         "sn": "Tester",
+         "displayName": "Glpi Tester",
+         "cn": "Glpi Tester",
+         "userAccountControl": "512"
+        }
+       ]
+      }
+     },
+     "[Google] Delete Guest": {
+      "__by_login": {
+       "glpi.tester": {
+        "statusCode": 204,
+        "body": ""
+       }
+      }
+     },
+     "[Redmine] Get Ticket History": {
+      "issue": {
+       "journals": [
+        {
+         "id": 1,
+         "notes": "Перевірка техніки (GLPI): за працівником числиться техніка.\nУ GLPI на користувачі ivan.testovenko:\n– Комп'ютер «Latitude 5490», інв. № 2000000000001"
+        }
+       ]
+      }
+     },
+     "[Google] Check API Access": {
+      "statusCode": 200
+     }
+    },
+    "counts": {
+     "[AD] Disable Account": 1,
+     "[AD] Move to Fired OU": 1,
+     "[Google] Delete Guest": 1,
+     "[Redmine] Update Ticket::close=True": 0,
+     "[Redmine] Update Ticket::close=False": 1,
+     "[Sheets] Add to Archive": 0
+    },
+    "has": {
+     "[Redmine] Update Ticket::close=False": [
+      {
+       "note": "~доступи закрито, заявку залишено відкритою (числиться техніка)"
+      },
+      {
+       "note": "~Latitude 5490"
+      }
+     ]
+    }
+   },
+   {
+    "stubs": {
+     "[Redmine] Get Open Leaver Tickets": [
+      {
+       "issues": [
+        {
+         "id": 50480,
+         "tracker": {
+          "id": 41,
+          "name": "GA | Leaver"
+         },
+         "status": {
+          "id": 1,
+          "name": "New"
+         },
+         "subject": "GA | Leaver | Тестовий Користувач Іванович | ",
+         "description": "В системі HRIS створено запит на розірвання договору. \r\n        ГА - Тестовий Користувач Іванович \r\n        AD - glpi.tester \r\n        тел: +380000000480 \r\n        Автор запиту - t.author\r\n        Заборгованості по техніці немає \r\n",
+         "custom_fields": [
+          {
+           "id": 30,
+           "name": "Termination date",
+           "value": "$YESTERDAY"
+          }
+         ]
+        }
+       ],
+       "total_count": 1,
+       "offset": 0,
+       "limit": 100
+      }
+     ],
+     "[AD] Search User": {
+      "__by_login": {
+       "glpi.tester": [
+        {
+         "dn": "CN=Glpi Tester,OU=Уволенные,DC=example,DC=com",
+         "userAccountControl": "514"
+        }
+       ]
+      }
+     },
+     "[Google] Delete Guest": {
+      "__by_login": {
+       "glpi.tester": {
+        "statusCode": 404,
+        "body": {
+         "error": {
+          "code": 404,
+          "message": "Resource Not Found: userKey"
+         }
+        }
+       }
+      }
+     },
+     "[Redmine] Get Ticket History": {
+      "issue": {
+       "journals": [
+        {
+         "id": 1,
+         "notes": "Перевірка техніки (GLPI): за працівником числиться техніка.\nУ GLPI на користувачі ivan.testovenko:\n– Комп'ютер «Latitude 5490», інв. № 2000000000001"
+        }
+       ]
+      }
+     },
+     "[Google] Check API Access": {
+      "statusCode": 200
+     }
+    },
+    "counts": {
+     "[AD] Disable Account": 0,
+     "[Redmine] Update Ticket": 0
+    }
+   },
+   {
+    "stubs": {
+     "[Redmine] Get Open Leaver Tickets": [
+      {
+       "issues": [
+        {
+         "id": 50480,
+         "tracker": {
+          "id": 41,
+          "name": "GA | Leaver"
+         },
+         "status": {
+          "id": 1,
+          "name": "New"
+         },
+         "subject": "GA | Leaver | Тестовий Користувач Іванович | ",
+         "description": "В системі HRIS створено запит на розірвання договору. \r\n        ГА - Тестовий Користувач Іванович \r\n        AD - glpi.tester \r\n        тел: +380000000480 \r\n        Автор запиту - t.author\r\n        Заборгованості по техніці немає \r\n",
+         "custom_fields": [
+          {
+           "id": 30,
+           "name": "Termination date",
+           "value": "$YESTERDAY"
+          }
+         ]
+        }
+       ],
+       "total_count": 1,
+       "offset": 0,
+       "limit": 100
+      }
+     ],
+     "[AD] Search User": {
+      "__by_login": {
+       "glpi.tester": [
+        {
+         "dn": "CN=Glpi Tester,OU=Уволенные,DC=example,DC=com",
+         "userAccountControl": "514"
+        }
+       ]
+      }
+     },
+     "[Google] Delete Guest": {
+      "__by_login": {
+       "glpi.tester": {
+        "statusCode": 404,
+        "body": {
+         "error": {
+          "code": 404,
+          "message": "Resource Not Found: userKey"
+         }
+        }
+       }
+      }
+     },
+     "[Redmine] Get Ticket History": {
+      "issue": {
+       "journals": [
+        {
+         "id": 1,
+         "notes": "Перевірка техніки (GLPI): за працівником числиться техніка.\nУ GLPI на користувачі ivan.testovenko:\n– Комп'ютер «Latitude 5490», інв. № 2000000000001"
+        },
+        {
+         "id": 2,
+         "notes": "Перевірка техніки (GLPI): Заборгованості по техніці немає."
+        }
+       ]
+      }
+     },
+     "[Google] Check API Access": {
+      "statusCode": 200
+     }
+    },
+    "counts": {
+     "[Redmine] Update Ticket::close=True": 1,
+     "[Sheets] Add to Archive": 1
+    }
+   }
+  ]
+ },
+ {
+  "name": "техніка: IT написав «закріплений ноутбук» -> заявка відкрита",
+  "stubs": {
+   "[Redmine] Get Open Leaver Tickets": [
+    {
+     "issues": [
+      {
+       "id": 50483,
+       "tracker": {
+        "id": 41,
+        "name": "GA | Leaver"
+       },
+       "status": {
+        "id": 1,
+        "name": "New"
+       },
+       "subject": "GA | Leaver | Тестовий Користувач Іванович | ",
+       "description": "В системі HRIS створено запит на розірвання договору. \r\n        ГА - Тестовий Користувач Іванович \r\n        AD - glpi.tester \r\n        тел: +380000000483 \r\n        Автор запиту - t.author\r\n        Заборгованості по техніці немає \r\n",
+       "custom_fields": [
+        {
+         "id": 30,
+         "name": "Termination date",
+         "value": "$YESTERDAY"
+        }
+       ]
+      }
+     ],
+     "total_count": 1,
+     "offset": 0,
+     "limit": 100
+    }
+   ],
+   "[AD] Search User": {
+    "__by_login": {
+     "glpi.tester": [
+      {
+       "dn": "CN=Glpi Tester,OU=linear_staff,OU=AllUsers,OU=COMPANY,DC=example,DC=com",
+       "sAMAccountName": "glpi.tester",
+       "givenName": "Glpi",
+       "sn": "Tester",
+       "displayName": "Glpi Tester",
+       "cn": "Glpi Tester",
+       "userAccountControl": "512"
+      }
+     ]
+    }
+   },
+   "[Google] Delete Guest": {
+    "__by_login": {
+     "glpi.tester": {
+      "statusCode": 204,
+      "body": ""
+     }
+    }
+   },
+   "[Redmine] Get Ticket History": {
+    "issue": {
+     "journals": [
+      {
+       "id": 1,
+       "notes": "За працівником закріплений ноутбук 2000000000009"
+      }
+     ]
+    }
+   },
+   "[Google] Check API Access": {
+    "statusCode": 200
+   }
+  },
+  "counts": {
+   "[Redmine] Update Ticket::close=True": 0,
+   "[Redmine] Update Ticket::close=False": 1
+  }
+ },
+ {
+  "name": "техніка: в AD і Google нікого, але числиться техніка -> заявка відкрита",
+  "stubs": {
+   "[Redmine] Get Open Leaver Tickets": [
+    {
+     "issues": [
+      {
+       "id": 50482,
+       "tracker": {
+        "id": 41,
+        "name": "GA | Leaver"
+       },
+       "status": {
+        "id": 1,
+        "name": "New"
+       },
+       "subject": "GA | Leaver | Тестовий Користувач Іванович | ",
+       "description": "В системі HRIS створено запит на розірвання договору. \r\n        ГА - Тестовий Користувач Іванович \r\n        AD - glpi.tester \r\n        тел: +380000000482 \r\n        Автор запиту - t.author\r\n        Заборгованості по техніці немає \r\n",
+       "custom_fields": [
+        {
+         "id": 30,
+         "name": "Termination date",
+         "value": "$YESTERDAY"
+        }
+       ]
+      }
+     ],
+     "total_count": 1,
+     "offset": 0,
+     "limit": 100
+    }
+   ],
+   "[AD] Search User": {
+    "__by_login": {
+     "glpi.tester": []
+    }
+   },
+   "[Google] Check Guest Exists": {
+    "__by_login": {
+     "glpi.tester": {
+      "statusCode": 404,
+      "body": {
+       "error": {
+        "code": 404,
+        "message": "Resource Not Found: userKey"
+       }
+      }
+     }
+    }
+   },
+   "[Redmine] Get Ticket History": {
+    "issue": {
+     "journals": [
+      {
+       "id": 1,
+       "notes": "Перевірка техніки (GLPI): за працівником числиться техніка.\nУ GLPI на користувачі ivan.testovenko:\n– Комп'ютер «Latitude 5490», інв. № 2000000000001"
+      }
+     ]
+    }
+   },
+   "[Google] Check API Access": {
+    "statusCode": 200
+   }
+  },
+  "counts": {
+   "[Redmine] Update Ticket::close=True": 0,
+   "[Redmine] Update Ticket::close=False": 1,
+   "[Sheets] Add to Archive": 0
+  },
+  "has": {
+   "[Redmine] Update Ticket::close=False": [
+    {
+     "note": "~доступів не знайдено, але за працівником числиться техніка"
+    }
+   ]
+  }
+ },
+ {
+  "name": "техніка: перевірка GLPI «потрібна перевірка IT» на закриття лінійного не впливає",
+  "stubs": {
+   "[Redmine] Get Open Leaver Tickets": [
+    {
+     "issues": [
+      {
+       "id": 50484,
+       "tracker": {
+        "id": 41,
+        "name": "GA | Leaver"
+       },
+       "status": {
+        "id": 1,
+        "name": "New"
+       },
+       "subject": "GA | Leaver | Тестовий Користувач Іванович | ",
+       "description": "В системі HRIS створено запит на розірвання договору. \r\n        ГА - Тестовий Користувач Іванович \r\n        AD - glpi.tester \r\n        тел: +380000000484 \r\n        Автор запиту - t.author\r\n        Заборгованості по техніці немає \r\n",
+       "custom_fields": [
+        {
+         "id": 30,
+         "name": "Termination date",
+         "value": "$YESTERDAY"
+        }
+       ]
+      }
+     ],
+     "total_count": 1,
+     "offset": 0,
+     "limit": 100
+    }
+   ],
+   "[AD] Search User": {
+    "__by_login": {
+     "glpi.tester": [
+      {
+       "dn": "CN=Glpi Tester,OU=linear_staff,OU=AllUsers,OU=COMPANY,DC=example,DC=com",
+       "sAMAccountName": "glpi.tester",
+       "givenName": "Glpi",
+       "sn": "Tester",
+       "displayName": "Glpi Tester",
+       "cn": "Glpi Tester",
+       "userAccountControl": "512"
+      }
+     ]
+    }
+   },
+   "[Google] Delete Guest": {
+    "__by_login": {
+     "glpi.tester": {
+      "statusCode": 204,
+      "body": ""
+     }
+    }
+   },
+   "[Redmine] Get Ticket History": {
+    "issue": {
+     "journals": [
+      {
+       "id": 1,
+       "notes": "Перевірка техніки (GLPI): потрібна перевірка IT.\nПрацівника «ivan.testovenko» у GLPI не знайдено."
+      }
+     ]
+    }
+   },
+   "[Google] Check API Access": {
+    "statusCode": 200
+   }
+  },
+  "counts": {
+   "[Redmine] Update Ticket::close=True": 1
+  }
  }
 ]

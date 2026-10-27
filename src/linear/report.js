@@ -2,10 +2,27 @@
 // Сюди приходить відповідь Google з двох гілок: видалення гостя (AD заблоковано або вже було) і перевірка гостя (в AD акаунта немає).
 // Закриваємо, якщо гостя видалено (2xx) або його не було (404, або 403 при робочому доступі до API). Інакше коментар, заявка відкрита;
 // наступного дня AD уже «already_done», тож повториться лише крок Google. Той самий коментар двічі не пишемо.
+// Техніка: якщо останній коментар про техніку каже, що вона числиться (IT або флоу перевірки техніки в GLPI),
+// доступи закриваємо, а заявку ні, доки не з'явиться коментар, що техніки немає.
+// @@equipment
 const d = $('Code: Decide AD Action').first().json;
-const r = $input.first().json;
+// Відповідь Google: з якої гілки, видно зі статусу AD (у циклі first() повертає запуск цієї заявки).
+const r = d.ad_status === 'not_found' ? $('[Google] Check Guest Exists').first().json : $('[Google] Delete Guest').first().json;
+const t = $input.first().json;
+const { equipment, equipment_note } = equipmentState(((t.issue || t).journals || []).filter(j => j && j.notes));
 const state = $getWorkflowStaticData('global');
 state.notified_run = state.notified_run || {};
+// Замість закриття: коментар про техніку один раз (поки коментар той самий), заявка відкрита.
+const holdForEquipment = head => {
+  const key = 'equipment:' + equipment_note;
+  const notify = state.notified_run[d.id] !== key;
+  state.notified_run[d.id] = key;
+  return { id: d.id, close: false, notify,
+    note: head + `Техніка: за працівником числиться техніка (коментар у заявці: «${equipment_note.slice(0, 600)}»).\n\n` +
+          'Що залишилось: повернення техніки. Коли техніку повернуто, напишіть коментар «Заборгованості по техніці немає» ' +
+          '(або зніміть техніку з працівника в GLPI, перевірка техніки напише це сама), і автоматизація закриє заявку під час наступного запуску.\n\n' +
+          'Заявку залишено відкритою. Автоматизація перевіряє заявку щодня о 18:00; той самий коментар повторно не пише.' };
+};
 
 const code = Number(r.statusCode || (r.error && (r.error.httpCode || r.error.status)) || 0);
 // Для сервісного акаунта «Google service account (guests)» неіснуючий гість дає 403, а не 404 (перевірено 14.10.2026:
@@ -19,7 +36,10 @@ let out;
 if (d.ad_status === 'not_found') {
   // Логін є, в AD акаунта немає. Гостя теж немає: записів ніде немає, імовірно видалено автоматично за неактивність.
   const checkedAd = `• Active Directory: пошук за логіном «${d.login}» по всьому домену, включно з OU «Уволенные»: акаунта немає.`;
-  if (gone) {
+  if (gone && equipment === 'debt') {
+    out = holdForEquipment('Автоматичний offboarding: доступів не знайдено, але за працівником числиться техніка, заявку залишено відкритою.\n\n' +
+      `Що перевірено:\n${checkedAd}\n• Google Workspace: гостьовий акаунт ${d.guest_email}: не існує (Google: ${code}).\n`);
+  } else if (gone) {
     delete state.notified_run[d.id];
     out = { id: d.id, close: true, notify: false, login: d.login, guest_email: d.guest_email, leaver_date: d.leaver_date,
       note: 'Автоматичний offboarding: доступів не знайдено, заявку закрито.\n\n' +
@@ -64,7 +84,9 @@ if (d.ad_status === 'not_found') {
     `\n• Статус: ${ad}\n` +
     `2. Google Workspace (Guest):\n• Акаунт: ${d.guest_email}\n• Статус: ${gw}\n`;
 
-  if (gwOk) {
+  if (gwOk && equipment === 'debt') {
+    out = holdForEquipment(`Автоматичний offboarding: доступи закрито, заявку залишено відкритою (числиться техніка).\nЗвіт про закриття доступів:\n${body}\n`);
+  } else if (gwOk) {
     delete state.notified_run[d.id];
     out = { id: d.id, close: true, notify: false, login: d.login, guest_email: d.guest_email, leaver_date: d.leaver_date,
       note: `Автоматичний offboarding успішно завершено.\nЗвіт про закриття доступів:\n${body}` +

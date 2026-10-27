@@ -14,8 +14,11 @@ REDMINE = "n8n-nodes-redmine.redmine"
 nodes, conns = [], {}
 
 
+EQUIPMENT_JS = (ROOT / "src" / "equipment_state.js").read_text(encoding="utf-8")
+
+
 def js(name):
-    return (SRC / name).read_text(encoding="utf-8")
+    return (SRC / name).read_text(encoding="utf-8").replace("// @@equipment\n", EQUIPMENT_JS)
 
 
 def node(name, type_, params, x, y, version=1, **extra):
@@ -68,6 +71,7 @@ STICKY = """## 🛡️ [PROD] Offboarding лінійного персоналу 
    * кілька, поза AllUsers, не знайдено за ПІБ, помилка: коментар, заявка відкрита.
 4. Google: на початку запуску перевірка доступу до API (читання одного користувача домену). Для цього сервісного акаунта неіснуючий гість дає 403, а не 404 (перевірено 14.10.2026), тому 403 = «гостя немає» лише якщо перевірка доступу пройшла.
    DELETE гостя. 2xx або «гостя немає»: закриваємо заявку (статус 17) зі звітом і пишемо в архів. Інша відповідь: коментар, повтор наступного дня.
+5. Техніка: останній коментар про техніку в заявці (IT або флоу «Перевірка техніки (GLPI)»). Числиться техніка: доступи закриваємо, заявку ні.
 
 **Без спаму:** коментар про ту саму проблему пишеться один раз (static data флоу).
 **Помилки:** Error Workflow."""
@@ -126,6 +130,9 @@ GC = node("[Google] Check Guest Exists", "n8n-nodes-base.httpRequest", {
     "options": {"response": {"response": {"fullResponse": True, "neverError": True}}}},
     1980, 760, version=4.2, onError="continueRegularOutput",
     credentials={"googleApi": {"id": "<GW_CRED>", "name": "Google service account (guests)"}})
+TH = node("[Redmine] Get Ticket History", REDMINE, {"operation": "get", "issueId": "={{ $('Code: Decide AD Action').first().json.id }}",
+          "include": ["journals"], "options": {}}, 2310, 300,
+          credentials={"redmineApi": {"id": "<REDMINE_CRED>", "name": "Redmine bot account"}})
 FR = code("Code: Build Report", "report.js", 2420, 300)
 NU = if_true("Update Ticket Needed?", "={{ $json.close || $json.notify }}", 2640, 300)
 UT = node("[Redmine] Update Ticket", REDMINE, {"operation": "update", "issueId": "={{ $json.id }}", "notes": "={{ $json.note }}",
@@ -158,7 +165,7 @@ link(S, D); link(D, SW)
 link(SW, UP, 0); link(SW, GW, 1); link(SW, GC, 2); link(SW, PN, 3)
 link(UP, MV, 0); link(UP, PN, 1)
 link(MV, GW, 0); link(MV, PN, 1)
-link(GW, FR); link(GC, FR)
+link(GW, TH); link(GC, TH); link(TH, FR)
 link(FR, NU); link(PN, NU)
 link(NU, UT, 0); link(NU, LP, 1)
 link(UT, AR)
@@ -166,15 +173,20 @@ link(AR, SH, 0); link(AR, LP, 1)
 link(SH, LP)
 
 
+import agent_hooks  # noqa: E402  (вхід від агента і запис у спільний аудит)
+agent_hooks.add(nodes, conns, "linear", "offboarding_linear", "[Google] Check API Access", "[Redmine] Update Ticket",
+                "Add to Archive?", "[Redmine] Comment Missing Data", "Ticket Ready?")
+
 # Розкладка сіткою по етапах: розбір заявок, AD, Google, звіт і оновлення заявки. Лише позиції нод.
 LAYOUT_ROWS = [
     ["Every Day 18:00", "[Google] Check API Access", "[Redmine] Get Open Leaver Tickets", "Code: Parse Tickets", "Ticket Ready?",
      "Loop Over Tickets", "[AD] Search User"],
     ["Code: Decide AD Action", "Route by AD Status", "[AD] Disable Account", "[AD] Move to Fired OU", "[Google] Delete Guest",
-     "Code: Build Report", "Update Ticket Needed?"],
+     "[Redmine] Get Ticket History", "Code: Build Report", "Update Ticket Needed?"],
 ]
 LAYOUT_EXTRA = {"[Redmine] Comment Missing Data": (4, 0.75), "Code: Build Problem Note": (2, 2), "[Google] Check Guest Exists": (4, 2),
-                "[Redmine] Update Ticket": (6, 2), "Add to Archive?": (6, 3), "[Sheets] Add to Archive": (7, 3)}
+                "[Redmine] Update Ticket": (7, 2), "Add to Archive?": (7, 3), "[Sheets] Add to Archive": (8, 3),
+                agent_hooks.TRIGGER: (0, 0.75), agent_hooks.LOG: (8, 2), agent_hooks.LOG_MISSING: (5, 0.75)}
 
 POS = {nm: (c, r) for r, row in enumerate(LAYOUT_ROWS) for c, nm in enumerate(row)}
 POS.update(LAYOUT_EXTRA)

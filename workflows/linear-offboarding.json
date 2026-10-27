@@ -79,7 +79,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Розбір заявок «GA | Leaver» (трекер 41): AD-логін, дата звільнення, гостьова пошта Google.\n// Вихід: action = 'process' (готово до обробки) або 'notify' (у заявці бракує даних, треба коментар).\n// Коментар про ту саму проблему пишеться один раз (пам'ять у static data флоу).\nconst TRACKER_ID = 41;\nconst LOGIN_CF_ID = 87;      // кастомне поле «AD login»\nconst TERM_DATE_CF_ID = 30;  // кастомне поле «Termination date»\nconst LOGIN_RE = /^[A-Za-z0-9][A-Za-z0-9._-]*(@[A-Za-z0-9.-]+\\.[A-Za-z]{2,})?$/;\n\nconst state = $getWorkflowStaticData('global');\nstate.notified_input = state.notified_input || {};\nstate.notified_run = state.notified_run || {};\n\nconst today = DateTime.now().setZone('Europe/Kyiv').toISODate();\n// Доступ до Google API працює? Тоді 403 на конкретного гостя означає «гостя немає» (див. final_report.js).\nconst hc = $('[Google] Check API Access').first().json;\nconst gw_ok = Number(hc.statusCode) === 200;\n\nlet issues = [];\nfor (const it of $input.all()) {\n  if (Array.isArray(it.json.issues)) issues.push(...it.json.issues);\n  else if (it.json && it.json.id) issues.push(it.json);\n}\n\nconst cf = (issue, id, name) => (issue.custom_fields || []).find(f => f.id === id || f.name === name);\n\n// Транслітерація за постановою КМУ №55 (2010), як імена записані в AD (Зразковий Олег -> Zrazkovyi Oleh).\nconst TR = { а:'a', б:'b', в:'v', г:'h', ґ:'g', д:'d', е:'e', є:'ie', ж:'zh', з:'z', и:'y', і:'i', ї:'i', й:'i', к:'k', л:'l',\n  м:'m', н:'n', о:'o', п:'p', р:'r', с:'s', т:'t', у:'u', ф:'f', х:'kh', ц:'ts', ч:'ch', ш:'sh', щ:'shch', ь:'', ю:'iu', я:'ia',\n  ы:'y', э:'e', ё:'io', ъ:'' };\nconst TR_START = { є:'ye', ї:'yi', й:'y', ю:'yu', я:'ya', ё:'yo' };\nfunction translit(word) {\n  const w = word.toLowerCase().replace(/[’'ʼ`]/g, '').replace(/зг/g, 'zgh');\n  let out = '';\n  for (let i = 0; i < w.length; i++) {\n    const c = w[i];\n    out += (i === 0 && TR_START[c]) || (TR[c] !== undefined ? TR[c] : c);\n  }\n  return out.charAt(0).toUpperCase() + out.slice(1);\n}\n// Шаблони логінів в AD (запасний пошук, якщо в акаунта не заповнені ім'я/прізвище):\n// ім'я.прізвище, і.прізвище, ms.і.прізвище, ms.ім'я.прізвище (ms. у старих акаунтів).\nconst loginVariants = (g, s) => {\n  const G = g.toLowerCase().replace(/[^a-z-]/g, ''), S = s.toLowerCase().replace(/[^a-z-]/g, '');\n  if (!G || !S) return [];\n  return [`${G}.${S}`, `${G[0]}.${S}`, `ms.${G[0]}.${S}`, `ms.${G}.${S}`];\n};\n// Значення для шаблону фільтра в LDAP-ноді: фіксовані слоти, зайві = NONE (нічого не знаходить).\n// Нода сама екранує підставлені в шаблон значення (після оновлення n8n фільтр цілком з виразу ламається),\n// тому тут лише прибираємо службові символи.\nconst NONE = '__none__';\nconst ldapClean = s => String(s).replace(/[\\\\*()\\0]/g, '');\nfunction slots(values, n) {\n  const u = [...new Set(values.map(ldapClean).filter(Boolean))];\n  if (u.length > n) throw new Error('Забагато значень для фільтра AD, ' + u.length + ' з ' + n);\n  return u.concat(Array(n - u.length).fill(NONE));\n}\n\n// Прізвище й ім'я з рядка «ГА - ...» або теми. Повертає пари [ім'я, прізвище] у порядку правдоподібності:\n// кирилиця «Прізвище Ім'я [По батькові]» -> транслітерація; латиниця «Ім'я [Друге] Прізвище» (регістр байдужий).\n// Для імен із трьох і більше латинських слів додатково пробуємо «перше + останнє» (в AD часто без середнього імені).\nconst titleCase = w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase();\nfunction parseName(issue) {\n  const m = (issue.description || '').match(/(?:^|[\\s|])ГА[ \\t]*[-–—:][ \\t]*([^\\r\\n]*)/);\n  const fio = ((m && m[1]) || (issue.subject || '').split('|')[2] || '').trim().replace(/^(ФОП|ФЛП)\\s+/i, '');\n  const words = fio.split(/\\s+/).filter(Boolean);\n  if (words.length < 2) return null;\n  let pairs;\n  if (words.every(w => /^[А-Яа-яЁёЄєІіЇїҐґ’'ʼ-]+$/.test(w))) {\n    const [sn, gn] = [translit(words[0]), translit(words[1])];\n    pairs = [[gn, sn], [sn, gn]];\n  } else if (words.every(w => /^[A-Za-z][A-Za-z’'ʼ.-]*$/.test(w))) {\n    const n = words.map(titleCase), first = n[0], last = n[n.length - 1];\n    pairs = n.length >= 3 ? [[first, last], [last, first], [first, n[1]], [n[1], first]] : [[first, last], [last, first]];\n  } else return null;\n  return { fio, pairs, gn: pairs[0][0], sn: pairs[0][1] };\n}\n\n// «Загалом днів співпраці: 24» із шаблону заявки (потрібно для перевірки акаунта за датою створення).\nfunction tenureOf(issue) {\n  const m = (issue.description || '').match(/співпраці[ \\t]*:[ \\t]*(\\d+)/i);\n  return m ? Number(m[1]) : null;\n}\n\nfunction parseLogin(issue) {\n  // Рядок «AD - login» в описі. [ \\t]* замість \\s*, щоб не перескочити на наступний рядок.\n  const m = (issue.description || '').match(/(?:^|[\\s|])AD[ \\t]*[-–—:][ \\t]*([^\\r\\n]*)/i);\n  let raw = m ? m[1].trim() : '';\n  if (!raw) {\n    const f = cf(issue, LOGIN_CF_ID, 'AD login');\n    raw = f && f.value ? String(f.value).trim() : '';\n  }\n  if (!raw) return { reason: 'no_login' };\n  const login = raw.split(/\\s+/)[0];\n  if (!LOGIN_RE.test(login)) return { reason: 'bad_login', value: raw };\n  return { login };\n}\n\nfunction parseDate(issue) {\n  const f = cf(issue, TERM_DATE_CF_ID, 'Termination date');\n  let d = (f && f.value) || issue.due_date || ((issue.subject || '').match(/(\\d{4}-\\d{2}-\\d{2})/) || [])[1] || '';\n  d = String(d).trim();\n  if (!d) return { reason: 'no_date' };\n  if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(d) || !DateTime.fromISO(d).isValid) return { reason: 'bad_date', value: d };\n  return { date: d };\n}\n\n// [що перевірено, результат, що робити далі]\nconst NOTES = {\n  no_login: () => ['• Рядок «AD -» в описі: порожній.\\n• Поле «AD login»: порожнє.\\n• ПІБ (рядок «ГА -» або тема заявки): не знайдено, тому пошук в AD за ПІБ неможливий.',\n    'AD-логін не вказано, і знайти працівника в AD немає за чим.',\n    ['впишіть логін у рядок «AD -» (або ПІБ у рядок «ГА -»), і автоматизація обробить заявку сама;',\n     'якщо акаунта в AD немає, перевірте гостьовий акаунт Google і закрийте заявку вручну.']],\n  bad_login: v => [`• Рядок «AD -» в описі: «${v}».`,\n    `AD-логін «${v}» має неприпустимий формат (очікується латиниця без пробілів, наприклад ivan.petrenko).`,\n    ['виправте логін у рядку «AD -», і автоматизація обробить заявку сама.']],\n  no_date: () => ['• Поле «Termination date»: порожнє.\\n• Due date: порожня.\\n• Дата в темі заявки (РРРР-ММ-ДД): немає.',\n    'не вказано дату звільнення, тому невідомо, коли закривати доступи.',\n    ['заповніть «Termination date» (РРРР-ММ-ДД); у день звільнення або пізніше автоматизація обробить заявку сама.']],\n  bad_date: v => [`• Дата звільнення в заявці: «${v}».`,\n    `дату «${v}» не вдалося розпізнати (очікується формат РРРР-ММ-ДД).`,\n    ['виправте дату в полі «Termination date», і автоматизація обробить заявку сама.']],\n};\nconst fmt = ([checked, result, next]) =>\n  `⚠ Автоматичний offboarding не виконано.\\n\\nЩо перевірено:\\n${checked}\\n\\nРезультат: ${result}\\n\\n` +\n  `Що робити далі:\\n${next.map((s, i) => `${i + 1}. ${s.charAt(0).toUpperCase()}${s.slice(1)}`).join('\\n')}\\n\\n` +\n  'Заявку залишено відкритою. Нічого в AD і Google не змінено. Автоматизація перевіряє заявку щодня о 18:00; про ту саму проблему повторно не пише.';\n\nconst results = [];\nconst openIds = new Set();\nfor (const issue of issues) {\n  if (!issue || !issue.tracker || issue.tracker.id !== TRACKER_ID) continue;\n  const id = issue.id;\n  openIds.add(String(id));\n  let L = parseLogin(issue);\n  const D = parseDate(issue);\n\n  // Дата в майбутньому: просто чекаємо, нічого не пишемо.\n  if (D.date && D.date > today) continue;\n\n  // Логіна немає: шукатимемо в AD за ПІБ (рішення приймає Decide AD Action).\n  const N = L.reason === 'no_login' ? parseName(issue) : null;\n  if (N) L = { name: N };\n\n  const problem = L.reason ? L : (D.reason ? D : null);\n  if (problem) {\n    const key = problem.reason + ':' + (problem.value || '');\n    if (state.notified_input[id] === key) continue;\n    state.notified_input[id] = key;\n    results.push({ json: {\n      action: 'notify', id, reason: problem.reason, subject: issue.subject || '',\n      note: fmt(NOTES[problem.reason](problem.value)),\n    } });\n    continue;\n  }\n\n  delete state.notified_input[id];\n  if (L.name) {\n    results.push({ json: {\n      action: 'process', gw_ok, id, lookup: 'name', login: '', guest_email: '', leaver_date: D.date, subject: issue.subject || '',\n      fio: L.name.fio, sn: L.name.sn, gn: L.name.gn, pairs: L.name.pairs,\n      tenure_days: tenureOf(issue),\n      login_variants: [...new Set(L.name.pairs.flatMap(([g, sn]) => loginVariants(g, sn)))],\n      ldap_sn: slots(L.name.pairs.map(p => p[1]), 4),\n      ldap_sam: slots(L.name.pairs.flatMap(([g, sn]) => loginVariants(g, sn)), 16),\n    } });\n    continue;\n  }\n  const email = L.login.includes('@') ? L.login : `${L.login}@example.com`;\n  const sam = email.split('@')[0];\n  const guest = email.endsWith('.guest.google') ? email : `${email.replace('@', '_')}@tenant.example.org.guest.google`;\n  results.push({ json: {\n    action: 'process', gw_ok, id, lookup: 'login', login: sam, guest_email: guest, leaver_date: D.date, subject: issue.subject || '',\n    ldap_sn: slots([], 4),\n    ldap_sam: slots([sam], 16),\n  } });\n}\n\n// Забуваємо закриті заявки.\nfor (const k of Object.keys(state.notified_input)) if (!openIds.has(k)) delete state.notified_input[k];\nfor (const k of Object.keys(state.notified_run)) if (!openIds.has(k)) delete state.notified_run[k];\n\nreturn results;\n"
+        "jsCode": "// Розбір заявок «GA | Leaver» (трекер 41): AD-логін, дата звільнення, гостьова пошта Google.\n// Вихід: action = 'process' (готово до обробки) або 'notify' (у заявці бракує даних, треба коментар).\n// Коментар про ту саму проблему пишеться один раз (пам'ять у static data флоу).\nconst TRACKER_ID = 41;\nconst LOGIN_CF_ID = 87;      // кастомне поле «AD login»\nconst TERM_DATE_CF_ID = 30;  // кастомне поле «Termination date»\nconst LOGIN_RE = /^[A-Za-z0-9][A-Za-z0-9._-]*(@[A-Za-z0-9.-]+\\.[A-Za-z]{2,})?$/;\n\nconst state = $getWorkflowStaticData('global');\nstate.notified_input = state.notified_input || {};\nstate.notified_run = state.notified_run || {};\n\nconst today = DateTime.now().setZone('Europe/Kyiv').toISODate();\n// Доступ до Google API працює? Тоді 403 на конкретного гостя означає «гостя немає» (див. final_report.js).\nconst hc = $('[Google] Check API Access').first().json;\nconst gw_ok = Number(hc.statusCode) === 200;\n\nlet issues = [];\nfor (const it of $input.all()) {\n  if (Array.isArray(it.json.issues)) issues.push(...it.json.issues);\n  else if (it.json && it.json.id) issues.push(it.json);\n}\n\nconst cf = (issue, id, name) => (issue.custom_fields || []).find(f => f.id === id || f.name === name);\n\n// Транслітерація за постановою КМУ №55 (2010), як імена записані в AD (Зразковий Олег -> Zrazkovyi Oleh).\nconst TR = { а:'a', б:'b', в:'v', г:'h', ґ:'g', д:'d', е:'e', є:'ie', ж:'zh', з:'z', и:'y', і:'i', ї:'i', й:'i', к:'k', л:'l',\n  м:'m', н:'n', о:'o', п:'p', р:'r', с:'s', т:'t', у:'u', ф:'f', х:'kh', ц:'ts', ч:'ch', ш:'sh', щ:'shch', ь:'', ю:'iu', я:'ia',\n  ы:'y', э:'e', ё:'io', ъ:'' };\nconst TR_START = { є:'ye', ї:'yi', й:'y', ю:'yu', я:'ya', ё:'yo' };\nfunction translit(word) {\n  const w = word.toLowerCase().replace(/[’'ʼ`]/g, '').replace(/зг/g, 'zgh');\n  let out = '';\n  for (let i = 0; i < w.length; i++) {\n    const c = w[i];\n    out += (i === 0 && TR_START[c]) || (TR[c] !== undefined ? TR[c] : c);\n  }\n  return out.charAt(0).toUpperCase() + out.slice(1);\n}\n// Шаблони логінів в AD (запасний пошук, якщо в акаунта не заповнені ім'я/прізвище):\n// ім'я.прізвище, і.прізвище, ms.і.прізвище, ms.ім'я.прізвище (ms. у старих акаунтів).\nconst loginVariants = (g, s) => {\n  const G = g.toLowerCase().replace(/[^a-z-]/g, ''), S = s.toLowerCase().replace(/[^a-z-]/g, '');\n  if (!G || !S) return [];\n  return [`${G}.${S}`, `${G[0]}.${S}`, `ms.${G[0]}.${S}`, `ms.${G}.${S}`];\n};\n// Значення для шаблону фільтра в LDAP-ноді: фіксовані слоти, зайві = NONE (нічого не знаходить).\n// Нода сама екранує підставлені в шаблон значення (після оновлення n8n фільтр цілком з виразу ламається),\n// тому тут лише прибираємо службові символи.\nconst NONE = '__none__';\nconst ldapClean = s => String(s).replace(/[\\\\*()\\0]/g, '');\nfunction slots(values, n) {\n  const u = [...new Set(values.map(ldapClean).filter(Boolean))];\n  if (u.length > n) throw new Error('Забагато значень для фільтра AD, ' + u.length + ' з ' + n);\n  return u.concat(Array(n - u.length).fill(NONE));\n}\n\n// Прізвище й ім'я з рядка «ГА - ...» або теми. Повертає пари [ім'я, прізвище] у порядку правдоподібності:\n// кирилиця «Прізвище Ім'я [По батькові]» -> транслітерація; латиниця «Ім'я [Друге] Прізвище» (регістр байдужий).\n// Для імен із трьох і більше латинських слів додатково пробуємо «перше + останнє» (в AD часто без середнього імені).\nconst titleCase = w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase();\nfunction parseName(issue) {\n  const m = (issue.description || '').match(/(?:^|[\\s|])ГА[ \\t]*[-–—:][ \\t]*([^\\r\\n]*)/);\n  const fio = ((m && m[1]) || (issue.subject || '').split('|')[2] || '').trim().replace(/^(ФОП|ФЛП)\\s+/i, '');\n  const words = fio.split(/\\s+/).filter(Boolean);\n  if (words.length < 2) return null;\n  let pairs;\n  if (words.every(w => /^[А-Яа-яЁёЄєІіЇїҐґ’'ʼ-]+$/.test(w))) {\n    const [sn, gn] = [translit(words[0]), translit(words[1])];\n    pairs = [[gn, sn], [sn, gn]];\n  } else if (words.every(w => /^[A-Za-z][A-Za-z’'ʼ.-]*$/.test(w))) {\n    const n = words.map(titleCase), first = n[0], last = n[n.length - 1];\n    pairs = n.length >= 3 ? [[first, last], [last, first], [first, n[1]], [n[1], first]] : [[first, last], [last, first]];\n  } else return null;\n  return { fio, pairs, gn: pairs[0][0], sn: pairs[0][1] };\n}\n\n// «Загалом днів співпраці: 24» із шаблону заявки (потрібно для перевірки акаунта за датою створення).\nfunction tenureOf(issue) {\n  const m = (issue.description || '').match(/співпраці[ \\t]*:[ \\t]*(\\d+)/i);\n  return m ? Number(m[1]) : null;\n}\n\nfunction parseLogin(issue) {\n  // Рядок «AD - login» в описі. [ \\t]* замість \\s*, щоб не перескочити на наступний рядок.\n  const m = (issue.description || '').match(/(?:^|[\\s|])AD[ \\t]*[-–—:][ \\t]*([^\\r\\n]*)/i);\n  let raw = m ? m[1].trim() : '';\n  if (!raw) {\n    const f = cf(issue, LOGIN_CF_ID, 'AD login');\n    raw = f && f.value ? String(f.value).trim() : '';\n  }\n  if (!raw) return { reason: 'no_login' };\n  const login = raw.split(/\\s+/)[0];\n  if (!LOGIN_RE.test(login)) return { reason: 'bad_login', value: raw };\n  return { login };\n}\n\nfunction parseDate(issue) {\n  const f = cf(issue, TERM_DATE_CF_ID, 'Termination date');\n  let d = (f && f.value) || issue.due_date || ((issue.subject || '').match(/(\\d{4}-\\d{2}-\\d{2})/) || [])[1] || '';\n  d = String(d).trim();\n  if (!d) return { reason: 'no_date' };\n  if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(d) || !DateTime.fromISO(d).isValid) return { reason: 'bad_date', value: d };\n  return { date: d };\n}\n\n// [що перевірено, результат, що робити далі]\nconst NOTES = {\n  no_login: () => ['• Рядок «AD -» в описі: порожній.\\n• Поле «AD login»: порожнє.\\n• ПІБ (рядок «ГА -» або тема заявки): не знайдено, тому пошук в AD за ПІБ неможливий.',\n    'AD-логін не вказано, і знайти працівника в AD немає за чим.',\n    ['впишіть логін у рядок «AD -» (або ПІБ у рядок «ГА -»), і автоматизація обробить заявку сама;',\n     'якщо акаунта в AD немає, перевірте гостьовий акаунт Google і закрийте заявку вручну.']],\n  bad_login: v => [`• Рядок «AD -» в описі: «${v}».`,\n    `AD-логін «${v}» має неприпустимий формат (очікується латиниця без пробілів, наприклад ivan.petrenko).`,\n    ['виправте логін у рядку «AD -», і автоматизація обробить заявку сама.']],\n  no_date: () => ['• Поле «Termination date»: порожнє.\\n• Due date: порожня.\\n• Дата в темі заявки (РРРР-ММ-ДД): немає.',\n    'не вказано дату звільнення, тому невідомо, коли закривати доступи.',\n    ['заповніть «Termination date» (РРРР-ММ-ДД); у день звільнення або пізніше автоматизація обробить заявку сама.']],\n  bad_date: v => [`• Дата звільнення в заявці: «${v}».`,\n    `дату «${v}» не вдалося розпізнати (очікується формат РРРР-ММ-ДД).`,\n    ['виправте дату в полі «Termination date», і автоматизація обробить заявку сама.']],\n};\nconst fmt = ([checked, result, next]) =>\n  `⚠ Автоматичний offboarding не виконано.\\n\\nЩо перевірено:\\n${checked}\\n\\nРезультат: ${result}\\n\\n` +\n  `Що робити далі:\\n${next.map((s, i) => `${i + 1}. ${s.charAt(0).toUpperCase()}${s.slice(1)}`).join('\\n')}\\n\\n` +\n  'Заявку залишено відкритою. Нічого в AD і Google не змінено. Автоматизація перевіряє заявку щодня о 18:00; про ту саму проблему повторно не пише.';\n\n// Виклик з агента («обробити зараз»): обробляємо лише цю заявку, а пам'ять про коментарі решти не чіпаємо (openIds повний)\nconst ONLY = (() => { try { return $('When Called by Agent').isExecuted ? (String($('When Called by Agent').first().json.ticket_id || '') || null) : null; } catch (e) { return null; } })();\nconst results = [];\nconst openIds = new Set();\nfor (const issue of issues) {\n  if (!issue || !issue.tracker || issue.tracker.id !== TRACKER_ID) continue;\n  const id = issue.id;\n  openIds.add(String(id));\n  if (ONLY && String(id) !== ONLY) continue;\n  let L = parseLogin(issue);\n  const D = parseDate(issue);\n\n  // Дата в майбутньому: просто чекаємо, нічого не пишемо.\n  if (D.date && D.date > today) continue;\n\n  // Логіна немає: шукатимемо в AD за ПІБ (рішення приймає Decide AD Action).\n  const N = L.reason === 'no_login' ? parseName(issue) : null;\n  if (N) L = { name: N };\n\n  const problem = L.reason ? L : (D.reason ? D : null);\n  if (problem) {\n    const key = problem.reason + ':' + (problem.value || '');\n    if (state.notified_input[id] === key) continue;\n    state.notified_input[id] = key;\n    results.push({ json: {\n      action: 'notify', id, reason: problem.reason, subject: issue.subject || '',\n      note: fmt(NOTES[problem.reason](problem.value)),\n    } });\n    continue;\n  }\n\n  delete state.notified_input[id];\n  if (L.name) {\n    results.push({ json: {\n      action: 'process', gw_ok, id, lookup: 'name', login: '', guest_email: '', leaver_date: D.date, subject: issue.subject || '',\n      fio: L.name.fio, sn: L.name.sn, gn: L.name.gn, pairs: L.name.pairs,\n      tenure_days: tenureOf(issue),\n      login_variants: [...new Set(L.name.pairs.flatMap(([g, sn]) => loginVariants(g, sn)))],\n      ldap_sn: slots(L.name.pairs.map(p => p[1]), 4),\n      ldap_sam: slots(L.name.pairs.flatMap(([g, sn]) => loginVariants(g, sn)), 16),\n    } });\n    continue;\n  }\n  const email = L.login.includes('@') ? L.login : `${L.login}@example.com`;\n  const sam = email.split('@')[0];\n  const guest = email.endsWith('.guest.google') ? email : `${email.replace('@', '_')}@tenant.example.org.guest.google`;\n  results.push({ json: {\n    action: 'process', gw_ok, id, lookup: 'login', login: sam, guest_email: guest, leaver_date: D.date, subject: issue.subject || '',\n    ldap_sn: slots([], 4),\n    ldap_sam: slots([sam], 16),\n  } });\n}\n\n// Забуваємо закриті заявки.\nfor (const k of Object.keys(state.notified_input)) if (!openIds.has(k)) delete state.notified_input[k];\nfor (const k of Object.keys(state.notified_run)) if (!openIds.has(k)) delete state.notified_run[k];\n\nreturn results;\n"
       },
       "id": "7df911ab-7b04-54c0-8357-d15068035387",
       "name": "Code: Parse Tickets",
@@ -416,14 +416,38 @@
     },
     {
       "parameters": {
-        "jsCode": "// Підсумок по заявці після кроку Google: текст звіту і рішення, чи закривати заявку.\n// Сюди приходить відповідь Google з двох гілок: видалення гостя (AD заблоковано або вже було) і перевірка гостя (в AD акаунта немає).\n// Закриваємо, якщо гостя видалено (2xx) або його не було (404, або 403 при робочому доступі до API). Інакше коментар, заявка відкрита;\n// наступного дня AD уже «already_done», тож повториться лише крок Google. Той самий коментар двічі не пишемо.\nconst d = $('Code: Decide AD Action').first().json;\nconst r = $input.first().json;\nconst state = $getWorkflowStaticData('global');\nstate.notified_run = state.notified_run || {};\n\nconst code = Number(r.statusCode || (r.error && (r.error.httpCode || r.error.status)) || 0);\n// Для сервісного акаунта «Google service account (guests)» неіснуючий гість дає 403, а не 404 (перевірено 14.10.2026:\n// наявний гість 200, вигаданий 403). Тому 403 = «гостя немає», лише якщо на початку запуску доступ до API працював.\nconst gone = code === 404 || (code === 403 && d.gw_ok === true);\nconst msg = (r.body && r.body.error && r.body.error.message) || (r.error && (r.error.message || r.error.description)) || r.statusMessage || 'невідома помилка';\nconst tail = 'Автоматизація перевіряє заявку щодня о 18:00; про ту саму проблему повторно не пише.';\nconst adminFix = '1. Перевірте права сервісного акаунта Google (User Management Admin) і ключ у кредах n8n «Google service account (guests)».\\n';\n\nlet out;\nif (d.ad_status === 'not_found') {\n  // Логін є, в AD акаунта немає. Гостя теж немає: записів ніде немає, імовірно видалено автоматично за неактивність.\n  const checkedAd = `• Active Directory: пошук за логіном «${d.login}» по всьому домену, включно з OU «Уволенные»: акаунта немає.`;\n  if (gone) {\n    delete state.notified_run[d.id];\n    out = { id: d.id, close: true, notify: false, login: d.login, guest_email: d.guest_email, leaver_date: d.leaver_date,\n      note: 'Автоматичний offboarding: доступів не знайдено, заявку закрито.\\n\\n' +\n            `Що перевірено:\\n${checkedAd}\\n• Google Workspace: гостьовий акаунт ${d.guest_email}: не існує (Google: ${code}).\\n\\n` +\n            'Висновок: записів про працівника немає ні в AD, ні в Google. Найімовірніше, акаунт було видалено автоматично ' +\n            'через тривалу неактивність. Закривати нічого.\\n\\n' +\n            'Архівування: запис додано до архівного реєстру Google Sheets.' };\n  } else {\n    const exists = code >= 200 && code < 300;\n    const key = exists ? 'nf_guest_exists' : 'nf_gw_error:' + code;\n    const notify = state.notified_run[d.id] !== key;\n    state.notified_run[d.id] = key;\n    out = { id: d.id, close: false, notify,\n      note: '⚠ Автоматичний offboarding не виконано.\\n\\n' +\n            `Що перевірено:\\n${checkedAd}\\n• Google Workspace: гостьовий акаунт ${d.guest_email}: ` +\n            (exists ? 'існує.' : `перевірити не вдалося (${code || 'немає відповіді'}): ${msg}.`) + '\\n\\n' +\n            (exists\n              ? 'Результат: в AD акаунта немає, а гостьовий акаунт у Google є. Так не має бути, тому автоматично нічого не видалено.\\n\\n' +\n                'Що робити далі:\\n1. Перевірте, чи правильний логін у рядку «AD -» (можлива помилка в логіні).\\n' +\n                '2. Якщо логін правильний, видаліть гостьовий акаунт вручну і закрийте заявку.\\n\\n'\n              : 'Результат: не вдалося перевірити Google, тому заявку не закрито.\\n\\n' +\n                `Що робити далі:\\n${adminFix}2. Автоматизація повторить перевірку під час наступного запуску.\\n\\n`) +\n            'Заявку залишено відкритою. Нічого в AD і Google не змінено. ' + tail };\n  }\n} else {\n  // AD заблоковано (щойно або раніше), результат видалення гостя.\n  let gw, gwOk;\n  if (code >= 200 && code < 300) { gw = 'Гостьовий запис видалено з домену.'; gwOk = true; }\n  else if (gone) { gw = `Гостьового запису не було (${code}), видаляти нічого.`; gwOk = true; }\n  else { gw = `НЕ видалено (${code || 'немає відповіді'}): ${msg}`; gwOk = false; }\n\n  const ad = d.ad_status === 'already_done'\n    ? 'Акаунт уже був заблокований і перебуває в OU «Уволенные».'\n    : 'Акаунт заблоковано та переміщено в OU «Уволенные».';\n  const body =\n    `1. Active Directory:\\n• Логін: ${d.login}` +\n    (d.found_by_name ? ` (у заявці не вказано, знайдено в AD за ПІБ «${d.fio}»: ${d.gn} ${d.sn}, єдиний збіг` +\n      (d.found_by_login_pattern ? '; ім’я/прізвище в AD не заповнені, знайдено за шаблоном логіна' : '') +\n      (d.tenure_checked ? '; перевірено за датою створення: ' + d.tenure_checked : '') +\n      (d.skipped_tenure ? '; інші акаунти з таким іменем пропущені (дата створення не збігається): ' + d.skipped_tenure : '') +\n      (d.ignored_disabled ? '; інші акаунти з таким іменем уже заблоковані й пропущені: ' + d.ignored_disabled : '') + ')' : '') +\n    `\\n• Статус: ${ad}\\n` +\n    `2. Google Workspace (Guest):\\n• Акаунт: ${d.guest_email}\\n• Статус: ${gw}\\n`;\n\n  if (gwOk) {\n    delete state.notified_run[d.id];\n    out = { id: d.id, close: true, notify: false, login: d.login, guest_email: d.guest_email, leaver_date: d.leaver_date,\n      note: `Автоматичний offboarding успішно завершено.\\nЗвіт про закриття доступів:\\n${body}` +\n            '3. Архівування:\\n• Запис додано до архівного реєстру Google Sheets.' };\n  } else {\n    const key = 'gw_error:' + code;\n    const notify = state.notified_run[d.id] !== key;\n    state.notified_run[d.id] = key;\n    const next = code === 403 || code === 401\n      ? adminFix\n      : '1. Перевірте гостьовий акаунт у консолі адміністратора Google Workspace і відповідь вище.\\n';\n    out = { id: d.id, close: false, notify,\n      note: `⚠ Автоматичний offboarding завершено частково: AD виконано, Google ні.\\n\\n${body}\\n` +\n            `Що робити далі:\\n${next}` +\n            '2. Нічого не робіть з AD: наступного запуску автоматизація побачить, що акаунт уже заблокований, і повторить лише крок Google.\\n' +\n            '3. Або видаліть гостя вручну і закрийте заявку.\\n\\n' +\n            'Заявку залишено відкритою. ' + tail };\n  }\n}\nreturn [{ json: out, pairedItem: { item: 0 } }];\n"
+        "operation": "get",
+        "issueId": "={{ $('Code: Decide AD Action').first().json.id }}",
+        "include": [
+          "journals"
+        ],
+        "options": {}
+      },
+      "id": "4c763375-a0f1-5cc3-8c44-ad7e076ae272",
+      "name": "[Redmine] Get Ticket History",
+      "type": "n8n-nodes-redmine.redmine",
+      "typeVersion": 1,
+      "position": [
+        1250,
+        230
+      ],
+      "credentials": {
+        "redmineApi": {
+          "id": "<REDMINE_CRED>",
+          "name": "Redmine bot account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Підсумок по заявці після кроку Google: текст звіту і рішення, чи закривати заявку.\n// Сюди приходить відповідь Google з двох гілок: видалення гостя (AD заблоковано або вже було) і перевірка гостя (в AD акаунта немає).\n// Закриваємо, якщо гостя видалено (2xx) або його не було (404, або 403 при робочому доступі до API). Інакше коментар, заявка відкрита;\n// наступного дня AD уже «already_done», тож повториться лише крок Google. Той самий коментар двічі не пишемо.\n// Техніка: якщо останній коментар про техніку каже, що вона числиться (IT або флоу перевірки техніки в GLPI),\n// доступи закриваємо, а заявку ні, доки не з'явиться коментар, що техніки немає.\n// ===== Стан техніки з коментарів заявки: спільний код флоу offboarding, збірка вставляє його замість рядка «// @@equipment». =====\n// Вирішує останній коментар про техніку: людини з IT або флоу перевірки техніки («Перевірка техніки (GLPI): ...»).\n// Звіти самого offboarding («Автоматичний offboarding») не рахуємо: старий бот писав там «Заборгованості немає».\n// \\p{L} з прапорцем u: без нього \\w і \\b у JS не бачать кирилицю.\nconst EQ_OK = /забор\\p{L}*\\s+по\\s+техн\\p{L}*\\s+нема|техн\\p{L}*\\s+(повернуто|повернув|повернула|здано|здав|здала)|нічого\\s+не\\s+числиться/iu;\nconst EQ_DEBT = /(закріплен\\p{L}*|числиться|не\\s+поверну\\p{L}*|не\\s+здан\\p{L}*)[^\\r\\n]{0,40}(ноут|техн|монітор|комп|пк|телефон|гарнітур|інв)/iu;\nconst EQ_GLPI = /^\\s*Перевірка\\s+техніки\\s+\\(GLPI\\)/iu;  // коментар флоу перевірки техніки без висновку = «невідомо»\nfunction equipmentState(journals) {\n  let equipment = 'unknown', equipment_note = '';\n  for (const j of journals || []) {\n    if (!j || !j.notes || /Автоматичний\\s+offboarding/i.test(j.notes)) continue;\n    if (EQ_DEBT.test(j.notes)) { equipment = 'debt'; equipment_note = j.notes.trim(); }\n    else if (EQ_OK.test(j.notes)) { equipment = 'ok'; equipment_note = j.notes.trim(); }\n    else if (EQ_GLPI.test(j.notes)) { equipment = 'unknown'; equipment_note = j.notes.trim(); }\n  }\n  return { equipment, equipment_note };\n}\n// ===== кінець стану техніки =====\nconst d = $('Code: Decide AD Action').first().json;\n// Відповідь Google: з якої гілки, видно зі статусу AD (у циклі first() повертає запуск цієї заявки).\nconst r = d.ad_status === 'not_found' ? $('[Google] Check Guest Exists').first().json : $('[Google] Delete Guest').first().json;\nconst t = $input.first().json;\nconst { equipment, equipment_note } = equipmentState(((t.issue || t).journals || []).filter(j => j && j.notes));\nconst state = $getWorkflowStaticData('global');\nstate.notified_run = state.notified_run || {};\n// Замість закриття: коментар про техніку один раз (поки коментар той самий), заявка відкрита.\nconst holdForEquipment = head => {\n  const key = 'equipment:' + equipment_note;\n  const notify = state.notified_run[d.id] !== key;\n  state.notified_run[d.id] = key;\n  return { id: d.id, close: false, notify,\n    note: head + `Техніка: за працівником числиться техніка (коментар у заявці: «${equipment_note.slice(0, 600)}»).\\n\\n` +\n          'Що залишилось: повернення техніки. Коли техніку повернуто, напишіть коментар «Заборгованості по техніці немає» ' +\n          '(або зніміть техніку з працівника в GLPI, перевірка техніки напише це сама), і автоматизація закриє заявку під час наступного запуску.\\n\\n' +\n          'Заявку залишено відкритою. Автоматизація перевіряє заявку щодня о 18:00; той самий коментар повторно не пише.' };\n};\n\nconst code = Number(r.statusCode || (r.error && (r.error.httpCode || r.error.status)) || 0);\n// Для сервісного акаунта «Google service account (guests)» неіснуючий гість дає 403, а не 404 (перевірено 14.10.2026:\n// наявний гість 200, вигаданий 403). Тому 403 = «гостя немає», лише якщо на початку запуску доступ до API працював.\nconst gone = code === 404 || (code === 403 && d.gw_ok === true);\nconst msg = (r.body && r.body.error && r.body.error.message) || (r.error && (r.error.message || r.error.description)) || r.statusMessage || 'невідома помилка';\nconst tail = 'Автоматизація перевіряє заявку щодня о 18:00; про ту саму проблему повторно не пише.';\nconst adminFix = '1. Перевірте права сервісного акаунта Google (User Management Admin) і ключ у кредах n8n «Google service account (guests)».\\n';\n\nlet out;\nif (d.ad_status === 'not_found') {\n  // Логін є, в AD акаунта немає. Гостя теж немає: записів ніде немає, імовірно видалено автоматично за неактивність.\n  const checkedAd = `• Active Directory: пошук за логіном «${d.login}» по всьому домену, включно з OU «Уволенные»: акаунта немає.`;\n  if (gone && equipment === 'debt') {\n    out = holdForEquipment('Автоматичний offboarding: доступів не знайдено, але за працівником числиться техніка, заявку залишено відкритою.\\n\\n' +\n      `Що перевірено:\\n${checkedAd}\\n• Google Workspace: гостьовий акаунт ${d.guest_email}: не існує (Google: ${code}).\\n`);\n  } else if (gone) {\n    delete state.notified_run[d.id];\n    out = { id: d.id, close: true, notify: false, login: d.login, guest_email: d.guest_email, leaver_date: d.leaver_date,\n      note: 'Автоматичний offboarding: доступів не знайдено, заявку закрито.\\n\\n' +\n            `Що перевірено:\\n${checkedAd}\\n• Google Workspace: гостьовий акаунт ${d.guest_email}: не існує (Google: ${code}).\\n\\n` +\n            'Висновок: записів про працівника немає ні в AD, ні в Google. Найімовірніше, акаунт було видалено автоматично ' +\n            'через тривалу неактивність. Закривати нічого.\\n\\n' +\n            'Архівування: запис додано до архівного реєстру Google Sheets.' };\n  } else {\n    const exists = code >= 200 && code < 300;\n    const key = exists ? 'nf_guest_exists' : 'nf_gw_error:' + code;\n    const notify = state.notified_run[d.id] !== key;\n    state.notified_run[d.id] = key;\n    out = { id: d.id, close: false, notify,\n      note: '⚠ Автоматичний offboarding не виконано.\\n\\n' +\n            `Що перевірено:\\n${checkedAd}\\n• Google Workspace: гостьовий акаунт ${d.guest_email}: ` +\n            (exists ? 'існує.' : `перевірити не вдалося (${code || 'немає відповіді'}): ${msg}.`) + '\\n\\n' +\n            (exists\n              ? 'Результат: в AD акаунта немає, а гостьовий акаунт у Google є. Так не має бути, тому автоматично нічого не видалено.\\n\\n' +\n                'Що робити далі:\\n1. Перевірте, чи правильний логін у рядку «AD -» (можлива помилка в логіні).\\n' +\n                '2. Якщо логін правильний, видаліть гостьовий акаунт вручну і закрийте заявку.\\n\\n'\n              : 'Результат: не вдалося перевірити Google, тому заявку не закрито.\\n\\n' +\n                `Що робити далі:\\n${adminFix}2. Автоматизація повторить перевірку під час наступного запуску.\\n\\n`) +\n            'Заявку залишено відкритою. Нічого в AD і Google не змінено. ' + tail };\n  }\n} else {\n  // AD заблоковано (щойно або раніше), результат видалення гостя.\n  let gw, gwOk;\n  if (code >= 200 && code < 300) { gw = 'Гостьовий запис видалено з домену.'; gwOk = true; }\n  else if (gone) { gw = `Гостьового запису не було (${code}), видаляти нічого.`; gwOk = true; }\n  else { gw = `НЕ видалено (${code || 'немає відповіді'}): ${msg}`; gwOk = false; }\n\n  const ad = d.ad_status === 'already_done'\n    ? 'Акаунт уже був заблокований і перебуває в OU «Уволенные».'\n    : 'Акаунт заблоковано та переміщено в OU «Уволенные».';\n  const body =\n    `1. Active Directory:\\n• Логін: ${d.login}` +\n    (d.found_by_name ? ` (у заявці не вказано, знайдено в AD за ПІБ «${d.fio}»: ${d.gn} ${d.sn}, єдиний збіг` +\n      (d.found_by_login_pattern ? '; ім’я/прізвище в AD не заповнені, знайдено за шаблоном логіна' : '') +\n      (d.tenure_checked ? '; перевірено за датою створення: ' + d.tenure_checked : '') +\n      (d.skipped_tenure ? '; інші акаунти з таким іменем пропущені (дата створення не збігається): ' + d.skipped_tenure : '') +\n      (d.ignored_disabled ? '; інші акаунти з таким іменем уже заблоковані й пропущені: ' + d.ignored_disabled : '') + ')' : '') +\n    `\\n• Статус: ${ad}\\n` +\n    `2. Google Workspace (Guest):\\n• Акаунт: ${d.guest_email}\\n• Статус: ${gw}\\n`;\n\n  if (gwOk && equipment === 'debt') {\n    out = holdForEquipment(`Автоматичний offboarding: доступи закрито, заявку залишено відкритою (числиться техніка).\\nЗвіт про закриття доступів:\\n${body}\\n`);\n  } else if (gwOk) {\n    delete state.notified_run[d.id];\n    out = { id: d.id, close: true, notify: false, login: d.login, guest_email: d.guest_email, leaver_date: d.leaver_date,\n      note: `Автоматичний offboarding успішно завершено.\\nЗвіт про закриття доступів:\\n${body}` +\n            '3. Архівування:\\n• Запис додано до архівного реєстру Google Sheets.' };\n  } else {\n    const key = 'gw_error:' + code;\n    const notify = state.notified_run[d.id] !== key;\n    state.notified_run[d.id] = key;\n    const next = code === 403 || code === 401\n      ? adminFix\n      : '1. Перевірте гостьовий акаунт у консолі адміністратора Google Workspace і відповідь вище.\\n';\n    out = { id: d.id, close: false, notify,\n      note: `⚠ Автоматичний offboarding завершено частково: AD виконано, Google ні.\\n\\n${body}\\n` +\n            `Що робити далі:\\n${next}` +\n            '2. Нічого не робіть з AD: наступного запуску автоматизація побачить, що акаунт уже заблокований, і повторить лише крок Google.\\n' +\n            '3. Або видаліть гостя вручну і закрийте заявку.\\n\\n' +\n            'Заявку залишено відкритою. ' + tail };\n  }\n}\nreturn [{ json: out, pairedItem: { item: 0 } }];\n"
       },
       "id": "9064db1f-1f72-5d39-b92d-30d04dc38577",
       "name": "Code: Build Report",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1250,
+        1500,
         230
       ]
     },
@@ -458,7 +482,7 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
       "position": [
-        1500,
+        1750,
         230
       ]
     },
@@ -477,7 +501,7 @@
       "type": "n8n-nodes-redmine.redmine",
       "typeVersion": 1,
       "position": [
-        1500,
+        1750,
         460
       ],
       "credentials": {
@@ -518,7 +542,7 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
       "position": [
-        1500,
+        1750,
         690
       ]
     },
@@ -596,7 +620,7 @@
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4,
       "position": [
-        1750,
+        2000,
         690
       ],
       "retryOnFail": true,
@@ -622,7 +646,7 @@
     },
     {
       "parameters": {
-        "content": "## 🛡️ [PROD] Offboarding лінійного персоналу (GA | Leaver)\nБлокування в AD, видалення гостя з Google Workspace, архів у Google Sheets, звіт у Redmine.\n\n**Розклад:** щодня о 18:00 (Europe/Kyiv).\n\n**Логіка**\n1. Redmine: відкриті заявки трекера 41, усі сторінки.\n2. Розбір: AD-логін (рядок `AD -` в описі або поле «AD login»; якщо порожньо, пошук в AD за ПІБ з рядка `ГА -` або теми, латиницею за КМУ-2010, лише при єдиному збігу імені та прізвища), дата звільнення (Termination date → Due date → тема). Дата в майбутньому: чекаємо. Немає логіна чи дати: один коментар у заявку, заявка відкрита.\n3. По кожній заявці: пошук у всьому AD за sAMAccountName.\n   * в `OU=AllUsers`: блокування (прапорець ACCOUNTDISABLE, інші не чіпаємо) і перенос в `OU=Уволенные` (LDAP-ноди, креди в n8n);\n   * вже заблокований в «Уволенные»: AD пропускаємо;\n   * логін є, а в AD немає: перевірка (читання) гостя Google; гостя теж немає = імовірно видалено автоматично за неактивність, закриваємо з поясненням; гість є = коментар;\n   * кілька, поза AllUsers, не знайдено за ПІБ, помилка: коментар, заявка відкрита.\n4. Google: на початку запуску перевірка доступу до API (читання одного користувача домену). Для цього сервісного акаунта неіснуючий гість дає 403, а не 404 (перевірено 14.10.2026), тому 403 = «гостя немає» лише якщо перевірка доступу пройшла.\n   DELETE гостя. 2xx або «гостя немає»: закриваємо заявку (статус 17) зі звітом і пишемо в архів. Інша відповідь: коментар, повтор наступного дня.\n\n**Без спаму:** коментар про ту саму проблему пишеться один раз (static data флоу).\n**Помилки:** Error Workflow.",
+        "content": "## 🛡️ [PROD] Offboarding лінійного персоналу (GA | Leaver)\nБлокування в AD, видалення гостя з Google Workspace, архів у Google Sheets, звіт у Redmine.\n\n**Розклад:** щодня о 18:00 (Europe/Kyiv).\n\n**Логіка**\n1. Redmine: відкриті заявки трекера 41, усі сторінки.\n2. Розбір: AD-логін (рядок `AD -` в описі або поле «AD login»; якщо порожньо, пошук в AD за ПІБ з рядка `ГА -` або теми, латиницею за КМУ-2010, лише при єдиному збігу імені та прізвища), дата звільнення (Termination date → Due date → тема). Дата в майбутньому: чекаємо. Немає логіна чи дати: один коментар у заявку, заявка відкрита.\n3. По кожній заявці: пошук у всьому AD за sAMAccountName.\n   * в `OU=AllUsers`: блокування (прапорець ACCOUNTDISABLE, інші не чіпаємо) і перенос в `OU=Уволенные` (LDAP-ноди, креди в n8n);\n   * вже заблокований в «Уволенные»: AD пропускаємо;\n   * логін є, а в AD немає: перевірка (читання) гостя Google; гостя теж немає = імовірно видалено автоматично за неактивність, закриваємо з поясненням; гість є = коментар;\n   * кілька, поза AllUsers, не знайдено за ПІБ, помилка: коментар, заявка відкрита.\n4. Google: на початку запуску перевірка доступу до API (читання одного користувача домену). Для цього сервісного акаунта неіснуючий гість дає 403, а не 404 (перевірено 14.10.2026), тому 403 = «гостя немає» лише якщо перевірка доступу пройшла.\n   DELETE гостя. 2xx або «гостя немає»: закриваємо заявку (статус 17) зі звітом і пишемо в архів. Інша відповідь: коментар, повтор наступного дня.\n5. Техніка: останній коментар про техніку в заявці (IT або флоу «Перевірка техніки (GLPI)»). Числиться техніка: доступи закриваємо, заявку ні.\n\n**Без спаму:** коментар про ту саму проблему пишеться один раз (static data флоу).\n**Помилки:** Error Workflow.",
         "height": 640,
         "width": 640,
         "color": 6
@@ -635,6 +659,237 @@
         0,
         -780
       ]
+    },
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "id": "eb3dbc69-fe87-5456-ab0b-ee24a5a68905",
+      "name": "When Called by Agent",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        172
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "row",
+        "operation": "insert",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "<AUDIT_TABLE>"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "matchingColumns": [],
+          "value": {
+            "ticket_id": "={{ $('Update Ticket Needed?').item.json.id }}",
+            "kind": "offboarding_linear",
+            "logins": "={{ $('Update Ticket Needed?').item.json.login || '' }}",
+            "outcome": "={{ $('Update Ticket Needed?').item.json.close ? 'closed' : 'commented' }}",
+            "dry_run": "={{ false }}",
+            "details": "={{ String($('Update Ticket Needed?').item.json.note || '').slice(0, 300) }}",
+            "at": "={{ $now.toISO() }}",
+            "payload": ""
+          },
+          "schema": [
+            {
+              "id": "ticket_id",
+              "displayName": "ticket_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "kind",
+              "displayName": "kind",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "logins",
+              "displayName": "logins",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "outcome",
+              "displayName": "outcome",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "dry_run",
+              "displayName": "dry_run",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "details",
+              "displayName": "details",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "at",
+              "displayName": "at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "payload",
+              "displayName": "payload",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "1db3c60a-f51a-58d5-a904-6e390f0c5c26",
+      "name": "[Data Table] Log Result",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        2000,
+        460
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "resource": "row",
+        "operation": "insert",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "<AUDIT_TABLE>"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "matchingColumns": [],
+          "value": {
+            "ticket_id": "={{ $('Ticket Ready?').item.json.id }}",
+            "kind": "offboarding_linear",
+            "logins": "={{ $('Ticket Ready?').item.json.login || '' }}",
+            "outcome": "missing_data",
+            "dry_run": "={{ false }}",
+            "details": "={{ String($('Ticket Ready?').item.json.note || '').slice(0, 300) }}",
+            "at": "={{ $now.toISO() }}",
+            "payload": ""
+          },
+          "schema": [
+            {
+              "id": "ticket_id",
+              "displayName": "ticket_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "kind",
+              "displayName": "kind",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "logins",
+              "displayName": "logins",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "outcome",
+              "displayName": "outcome",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "dry_run",
+              "displayName": "dry_run",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "details",
+              "displayName": "details",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "at",
+              "displayName": "at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "payload",
+              "displayName": "payload",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "e3d0a676-fa75-52a4-83c4-7438694e5952",
+      "name": "[Data Table] Log Missing Data",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        1250,
+        172
+      ],
+      "onError": "continueRegularOutput"
     }
   ],
   "connections": {
@@ -806,7 +1061,7 @@
       "main": [
         [
           {
-            "node": "Code: Build Report",
+            "node": "[Redmine] Get Ticket History",
             "type": "main",
             "index": 0
           }
@@ -814,6 +1069,17 @@
       ]
     },
     "[Google] Check Guest Exists": {
+      "main": [
+        [
+          {
+            "node": "[Redmine] Get Ticket History",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "[Redmine] Get Ticket History": {
       "main": [
         [
           {
@@ -868,6 +1134,11 @@
       "main": [
         [
           {
+            "node": "[Data Table] Log Result",
+            "type": "main",
+            "index": 0
+          },
+          {
             "node": "Add to Archive?",
             "type": "main",
             "index": 0
@@ -898,6 +1169,28 @@
         [
           {
             "node": "Loop Over Tickets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When Called by Agent": {
+      "main": [
+        [
+          {
+            "node": "[Google] Check API Access",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "[Redmine] Comment Missing Data": {
+      "main": [
+        [
+          {
+            "node": "[Data Table] Log Missing Data",
             "type": "main",
             "index": 0
           }

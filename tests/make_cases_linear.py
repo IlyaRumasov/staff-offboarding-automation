@@ -249,6 +249,36 @@ cases = [
                                       "ldap_sam": ['adam.tester', 'a.tester', 'ms.a.tester', 'ms.adam.tester', 'tester.adam', 't.adam', 'ms.t.adam', 'ms.tester.adam', 'adam.leopold', 'a.leopold', 'ms.a.leopold', 'ms.adam.leopold', 'leopold.adam', 'l.adam', 'ms.l.adam', 'ms.leopold.adam']}]}}
 ]
 
+TH = "[Redmine] Get Ticket History"
+H_DEBT = {"issue": {"journals": [{"id": 1, "notes": "Перевірка техніки (GLPI): за працівником числиться техніка.\nУ GLPI на користувачі ivan.testovenko:\n– Комп'ютер «Latitude 5490», інв. № 2000000000001"}]}}
+cases += [
+    {"name": "техніка (коментар перевірки GLPI): AD і гість закриті, заявка відкрита, наступного дня мовчимо, після «немає» закрито",
+     "steps": [
+         {"stubs": {F: fetch(issue(50480, login="glpi.tester")), LS: by({"glpi.tester": [person("glpi.tester", "Glpi", "Tester")]}),
+                    GW: by({"glpi.tester": GW204}), TH: H_DEBT},
+          "counts": {UP: 1, MV: 1, GW: 1, CLOSE: 0, CPROB: 1, SHEET: 0},
+          "has": {CPROB: [{"note": "~доступи закрито, заявку залишено відкритою (числиться техніка)"}, {"note": "~Latitude 5490"}]}},
+         {"stubs": {F: fetch(issue(50480, login="glpi.tester")), LS: by(ldap("glpi.tester", f"CN=Glpi Tester,{FIRED}", "514")),
+                    GW: by({"glpi.tester": GW404}), TH: H_DEBT},
+          "counts": {UP: 0, UPDATE: 0}},
+         {"stubs": {F: fetch(issue(50480, login="glpi.tester")), LS: by(ldap("glpi.tester", f"CN=Glpi Tester,{FIRED}", "514")),
+                    GW: by({"glpi.tester": GW404}),
+                    TH: {"issue": {"journals": [{"id": 1, "notes": "Перевірка техніки (GLPI): за працівником числиться техніка.\nУ GLPI на користувачі ivan.testovenko:\n– Комп'ютер «Latitude 5490», інв. № 2000000000001"}, {"id": 2, "notes": "Перевірка техніки (GLPI): Заборгованості по техніці немає."}]}}},
+          "counts": {CLOSE: 1, SHEET: 1}}]},
+    {"name": "техніка: IT написав «закріплений ноутбук» -> заявка відкрита",
+     "stubs": {F: fetch(issue(50483, login="glpi.tester")), LS: by({"glpi.tester": [person("glpi.tester", "Glpi", "Tester")]}),
+               GW: by({"glpi.tester": GW204}), TH: {"issue": {"journals": [{"id": 1, "notes": "За працівником закріплений ноутбук 2000000000009"}]}}},
+     "counts": {CLOSE: 0, CPROB: 1}},
+    {"name": "техніка: в AD і Google нікого, але числиться техніка -> заявка відкрита",
+     "stubs": {F: fetch(issue(50482, login="glpi.tester")), LS: by({"glpi.tester": []}), GC: by({"glpi.tester": GW404}), TH: H_DEBT},
+     "counts": {CLOSE: 0, CPROB: 1, SHEET: 0},
+     "has": {CPROB: [{"note": "~доступів не знайдено, але за працівником числиться техніка"}]}},
+    {"name": "техніка: перевірка GLPI «потрібна перевірка IT» на закриття лінійного не впливає",
+     "stubs": {F: fetch(issue(50484, login="glpi.tester")), LS: by({"glpi.tester": [person("glpi.tester", "Glpi", "Tester")]}),
+               GW: by({"glpi.tester": GW204}), TH: {"issue": {"journals": [{"id": 1, "notes": "Перевірка техніки (GLPI): потрібна перевірка IT.\nПрацівника «ivan.testovenko» у GLPI не знайдено."}]}}},
+     "counts": {CLOSE: 1}},
+]
+
 HC = "[Google] Check API Access"
 for c in cases:
     for st in (c.get("steps") or [c]):

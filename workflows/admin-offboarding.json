@@ -49,7 +49,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Розбір заявок «Admin | Leaver» (трекер 25): дата звільнення, ім'я (обидва порядки), кому передати диск.\n// Вихід: action = 'process' або 'notify' (бракує даних; коментар пишеться один раз, пам'ять у static data).\nconst TERM_DATE_CF_ID = 30;   // «Termination date» (на тесті інший номер, тому шукаємо й за назвою)\nconst ENG_CF_ID = 11, UKR_CF_ID = 103, MANAGER_CF_ID = 25;\n\nconst state = $getWorkflowStaticData('global');\nstate.notified = state.notified || {};\nconst today = DateTime.now().setZone('Europe/Kyiv').toISODate();\n\nlet issues = [];\nfor (const it of $input.all()) {\n  if (Array.isArray(it.json.issues)) issues.push(...it.json.issues);\n  else if (it.json && it.json.id) issues.push(it.json);\n}\nconst cf = (issue, id, name) => (issue.custom_fields || []).find(f => f.id === id || f.name === name);\nconst cfv = (issue, id, name) => { const f = cf(issue, id, name); return f && f.value ? String(f.value).trim() : ''; };\n\n// Транслітерація КМУ-2010 (як імена записані в AD/Google).\nconst TR = { а:'a', б:'b', в:'v', г:'h', ґ:'g', д:'d', е:'e', є:'ie', ж:'zh', з:'z', и:'y', і:'i', ї:'i', й:'i', к:'k', л:'l',\n  м:'m', н:'n', о:'o', п:'p', р:'r', с:'s', т:'t', у:'u', ф:'f', х:'kh', ц:'ts', ч:'ch', ш:'sh', щ:'shch', ь:'', ю:'iu', я:'ia',\n  ы:'y', э:'e', ё:'io', ъ:'' };\nconst TR_START = { є:'ye', ї:'yi', й:'y', ю:'yu', я:'ya', ё:'yo' };\nfunction translit(word) {\n  const w = word.toLowerCase().replace(/[’'ʼ`]/g, '').replace(/зг/g, 'zgh');\n  let out = '';\n  for (let i = 0; i < w.length; i++) out += (i === 0 && TR_START[w[i]]) || (TR[w[i]] !== undefined ? TR[w[i]] : w[i]);\n  return out.charAt(0).toUpperCase() + out.slice(1);\n}\nconst isCyr = s => /[А-Яа-яЁёЄєІіЇїҐґ]/.test(s);\nconst isLat = s => /^[A-Za-z][A-Za-z'’ʼ-]*$/.test(s);\n\n// Пари [ім'я, прізвище] в обох порядках: «Ivan Testovenko» і «Probenko Olha» пишуть по-різному.\nfunction namePairs(raw) {\n  const parts = String(raw || '').replace(/^(ФОП|ФЛП)\\s+/i, '').split(/[\\s/,]+/).filter(Boolean);\n  if (parts.length < 2) return [];\n  let a = parts[0], b = parts[1];\n  if (isCyr(a) || isCyr(b)) { if (!isCyr(a) || !isCyr(b)) return []; a = translit(a); b = translit(b); }\n  else if (!isLat(a) || !isLat(b)) return [];\n  const pairs = [[a, b], [b, a]];\n  // Латиниця з трьох-чотирьох слів («Adam Leopold Tester»): в AD і Google часто лише «перше + останнє».\n  if (!isCyr(parts[0]) && parts.length >= 3 && parts.length <= 4 && parts.every(isLat)) {\n    const f = parts[0], l = parts[parts.length - 1];\n    pairs.unshift([f, l], [l, f]);\n  }\n  return pairs.filter((p, i, arr) => arr.findIndex(q => q[0] === p[0] && q[1] === p[1]) === i);\n}\n\nfunction parseDate(issue) {\n  let d = cfv(issue, TERM_DATE_CF_ID, 'Termination date') || issue.due_date || '';\n  d = String(d).trim();\n  if (!d) return { reason: 'no_date' };\n  if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(d) || !DateTime.fromISO(d).isValid) return { reason: 'bad_date', value: d };\n  return { date: d };\n}\n\n// Кому передати диск. mode: email | name | manager | none\nconst NO_TRANSFER = /(не\\s*(потрібно|треба|переадресов\\p{L}*|передава\\p{L}*)|видалити|немає|^ні$|^-$)/iu;\nfunction parseDrive(description, manager) {\n  const d = description || '';\n  if (/(дані|диск)[^\\r\\n]{0,40}передавати\\s+не\\s+потрібно/i.test(d)) return { mode: 'none', text: 'передавати не потрібно' };\n  const m = d.match(/Переадресація\\s+диску\\s*[:\\-–—]\\s*([^\\r\\n]*)/i)\n         || d.match(/Дані\\s+(?:пошти\\s+(?:та|і|й)\\s+)?диску\\s+передати\\s*[:\\-–—]?\\s*([^\\r\\n]*)/i);\n  if (m) {\n    const v = m[1].trim();\n    const email = (v.match(/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}/) || [])[0];\n    if (email) return { mode: 'email', email: email.toLowerCase(), text: v };\n    if (!v || NO_TRANSFER.test(v)) return { mode: 'none', text: v || 'не вказано' };\n    const pairs = namePairs(v.replace(/[-–—].*$/, '').trim());\n    return pairs.length ? { mode: 'name', name: v, pairs, text: v } : { mode: 'unknown', text: v };\n  }\n  const mp = namePairs(manager);\n  return mp.length ? { mode: 'manager', name: manager, pairs: mp, text: `не вказано, менеджер: ${manager}` }\n                   : { mode: 'unknown', text: 'не вказано, менеджера в заявці немає' };\n}\n\nconst NOTES = {\n  no_date: () => ['• Поле «Termination date»: порожнє.\\n• Due date: порожня.',\n    'не вказано дату звільнення, тому невідомо, коли закривати доступи.',\n    ['заповніть «Termination date» (РРРР-ММ-ДД); у день звільнення або пізніше автоматизація обробить заявку сама.']],\n  bad_date: v => [`• Дата звільнення в заявці: «${v}».`, `дату «${v}» не вдалося розпізнати (очікується РРРР-ММ-ДД).`,\n    ['виправте дату в полі «Termination date», і автоматизація обробить заявку сама.']],\n  no_name: v => [`• «Contractor (ENG)»: «${v.eng || ''}».\\n• «Contractor (UKR)»: «${v.ukr || ''}».`,\n    'не вдалося визначити ім\\'я та прізвище працівника, тому шукати його в AD, Google і M365 немає за чим.',\n    ['заповніть «Contractor (ENG)» у форматі «Ім\\'я Прізвище» латиницею.']],\n};\nconst fmt = ([checked, result, next]) =>\n  `⚠ Автоматичний offboarding не виконано.\\n\\nЩо перевірено:\\n${checked}\\n\\nРезультат: ${result}\\n\\n` +\n  `Що робити далі:\\n${next.map((s, i) => `${i + 1}. ${s.charAt(0).toUpperCase()}${s.slice(1)}`).join('\\n')}\\n\\n` +\n  'Заявку залишено відкритою. Нічого в AD, Google і M365 не змінено. Автоматизація перевіряє заявку щодня о 18:00; про ту саму проблему повторно не пише.';\n\nconst results = [];\nconst openIds = new Set();\nfor (const issue of issues) {\n  if (!issue || !issue.tracker || issue.tracker.id !== 25) continue;\n  const id = issue.id;\n  openIds.add(String(id));\n  const D = parseDate(issue);\n  if (D.date && D.date > today) continue;  // ще не звільнився\n\n  const eng = cfv(issue, ENG_CF_ID, 'Contractor (ENG)');\n  const ukr = cfv(issue, UKR_CF_ID, 'Contractor (UKR)');\n  const pairs = namePairs(eng).length ? namePairs(eng) : namePairs(ukr);\n  const problem = D.reason ? D : (!pairs.length ? { reason: 'no_name', value: { eng, ukr } } : null);\n  if (problem) {\n    const key = 'input:' + problem.reason + ':' + JSON.stringify(problem.value || '');\n    if (state.notified[id] === key) continue;\n    state.notified[id] = key;\n    results.push({ json: { action: 'notify', id, reason: problem.reason, note: fmt(NOTES[problem.reason](problem.value)) } });\n    continue;\n  }\n  if (String(state.notified[id] || '').startsWith('input:')) delete state.notified[id];\n  const manager = cfv(issue, MANAGER_CF_ID, 'Manager');\n  // Шаблони логінів в AD (запасний пошук, якщо в акаунта не заповнені ім'я/прізвище):\n// ім'я.прізвище, і.прізвище, ms.і.прізвище, ms.ім'я.прізвище (ms. у старих акаунтів).\nconst loginVariants = (g, s) => {\n  const G = g.toLowerCase().replace(/[^a-z-]/g, ''), S = s.toLowerCase().replace(/[^a-z-]/g, '');\n  if (!G || !S) return [];\n  return [`${G}.${S}`, `${G[0]}.${S}`, `ms.${G[0]}.${S}`, `ms.${G}.${S}`];\n};\n  // Значення для шаблону фільтра в LDAP-ноді: фіксовані слоти, зайві = NONE (нічого не знаходить).\n  // Нода сама екранує підставлені значення, тому тут лише прибираємо службові символи.\n  const NONE = '__none__';\n  const ldapClean = s => String(s).replace(/[\\\\*()\\0]/g, '');\n  const pad = (values, n) => {\n    if (values.length > n) throw new Error('Забагато значень для фільтра AD, ' + values.length + ' з ' + n);\n    return values.concat(Array(n - values.length).fill(NONE));\n  };\n  results.push({ json: {\n    action: 'process', id, subject: issue.subject || '', leaver_date: D.date,\n    person: eng || ukr, pairs, drive: parseDrive(issue.description, manager === '-' ? '' : manager),\n    login_variants: [...new Set(pairs.flatMap(([g, s]) => loginVariants(g, s)))],\n    ldap_gn: pad(pairs.map(p => ldapClean(p[0])), 4),\n    ldap_sn: pad(pairs.map(p => ldapClean(p[1])), 4),\n    ldap_sam: pad([...new Set(pairs.flatMap(([g, s]) => loginVariants(g, s)).map(ldapClean).filter(Boolean))], 16),\n  } });\n}\nfor (const k of Object.keys(state.notified)) if (!openIds.has(k)) delete state.notified[k];\nreturn results;\n"
+        "jsCode": "// Розбір заявок «Admin | Leaver» (трекер 25): дата звільнення, ім'я (обидва порядки), кому передати диск.\n// Вихід: action = 'process' або 'notify' (бракує даних; коментар пишеться один раз, пам'ять у static data).\nconst TERM_DATE_CF_ID = 30;   // «Termination date» (на тесті інший номер, тому шукаємо й за назвою)\nconst ENG_CF_ID = 11, UKR_CF_ID = 103, MANAGER_CF_ID = 25;\n\nconst state = $getWorkflowStaticData('global');\nstate.notified = state.notified || {};\nconst today = DateTime.now().setZone('Europe/Kyiv').toISODate();\n\nlet issues = [];\nfor (const it of $input.all()) {\n  if (Array.isArray(it.json.issues)) issues.push(...it.json.issues);\n  else if (it.json && it.json.id) issues.push(it.json);\n}\nconst cf = (issue, id, name) => (issue.custom_fields || []).find(f => f.id === id || f.name === name);\nconst cfv = (issue, id, name) => { const f = cf(issue, id, name); return f && f.value ? String(f.value).trim() : ''; };\n\n// Транслітерація КМУ-2010 (як імена записані в AD/Google).\nconst TR = { а:'a', б:'b', в:'v', г:'h', ґ:'g', д:'d', е:'e', є:'ie', ж:'zh', з:'z', и:'y', і:'i', ї:'i', й:'i', к:'k', л:'l',\n  м:'m', н:'n', о:'o', п:'p', р:'r', с:'s', т:'t', у:'u', ф:'f', х:'kh', ц:'ts', ч:'ch', ш:'sh', щ:'shch', ь:'', ю:'iu', я:'ia',\n  ы:'y', э:'e', ё:'io', ъ:'' };\nconst TR_START = { є:'ye', ї:'yi', й:'y', ю:'yu', я:'ya', ё:'yo' };\nfunction translit(word) {\n  const w = word.toLowerCase().replace(/[’'ʼ`]/g, '').replace(/зг/g, 'zgh');\n  let out = '';\n  for (let i = 0; i < w.length; i++) out += (i === 0 && TR_START[w[i]]) || (TR[w[i]] !== undefined ? TR[w[i]] : w[i]);\n  return out.charAt(0).toUpperCase() + out.slice(1);\n}\nconst isCyr = s => /[А-Яа-яЁёЄєІіЇїҐґ]/.test(s);\nconst isLat = s => /^[A-Za-z][A-Za-z'’ʼ-]*$/.test(s);\n\n// Пари [ім'я, прізвище] в обох порядках: «Ivan Testovenko» і «Probenko Olha» пишуть по-різному.\nfunction namePairs(raw) {\n  const parts = String(raw || '').replace(/^(ФОП|ФЛП)\\s+/i, '').split(/[\\s/,]+/).filter(Boolean);\n  if (parts.length < 2) return [];\n  let a = parts[0], b = parts[1];\n  if (isCyr(a) || isCyr(b)) { if (!isCyr(a) || !isCyr(b)) return []; a = translit(a); b = translit(b); }\n  else if (!isLat(a) || !isLat(b)) return [];\n  const pairs = [[a, b], [b, a]];\n  // Латиниця з трьох-чотирьох слів («Adam Leopold Tester»): в AD і Google часто лише «перше + останнє».\n  if (!isCyr(parts[0]) && parts.length >= 3 && parts.length <= 4 && parts.every(isLat)) {\n    const f = parts[0], l = parts[parts.length - 1];\n    pairs.unshift([f, l], [l, f]);\n  }\n  return pairs.filter((p, i, arr) => arr.findIndex(q => q[0] === p[0] && q[1] === p[1]) === i);\n}\n\nfunction parseDate(issue) {\n  let d = cfv(issue, TERM_DATE_CF_ID, 'Termination date') || issue.due_date || '';\n  d = String(d).trim();\n  if (!d) return { reason: 'no_date' };\n  if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(d) || !DateTime.fromISO(d).isValid) return { reason: 'bad_date', value: d };\n  return { date: d };\n}\n\n// Кому передати диск. mode: email | name | manager | none\nconst NO_TRANSFER = /(не\\s*(потрібно|треба|переадресов\\p{L}*|передава\\p{L}*)|видалити|немає|^ні$|^-$)/iu;\nfunction parseDrive(description, manager) {\n  const d = description || '';\n  if (/(дані|диск)[^\\r\\n]{0,40}передавати\\s+не\\s+потрібно/i.test(d)) return { mode: 'none', text: 'передавати не потрібно' };\n  const m = d.match(/Переадресація\\s+диску\\s*[:\\-–—]\\s*([^\\r\\n]*)/i)\n         || d.match(/Дані\\s+(?:пошти\\s+(?:та|і|й)\\s+)?диску\\s+передати\\s*[:\\-–—]?\\s*([^\\r\\n]*)/i);\n  if (m) {\n    const v = m[1].trim();\n    const email = (v.match(/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}/) || [])[0];\n    if (email) return { mode: 'email', email: email.toLowerCase(), text: v };\n    if (!v || NO_TRANSFER.test(v)) return { mode: 'none', text: v || 'не вказано' };\n    const pairs = namePairs(v.replace(/[-–—].*$/, '').trim());\n    return pairs.length ? { mode: 'name', name: v, pairs, text: v } : { mode: 'unknown', text: v };\n  }\n  const mp = namePairs(manager);\n  return mp.length ? { mode: 'manager', name: manager, pairs: mp, text: `не вказано, менеджер: ${manager}` }\n                   : { mode: 'unknown', text: 'не вказано, менеджера в заявці немає' };\n}\n\nconst NOTES = {\n  no_date: () => ['• Поле «Termination date»: порожнє.\\n• Due date: порожня.',\n    'не вказано дату звільнення, тому невідомо, коли закривати доступи.',\n    ['заповніть «Termination date» (РРРР-ММ-ДД); у день звільнення або пізніше автоматизація обробить заявку сама.']],\n  bad_date: v => [`• Дата звільнення в заявці: «${v}».`, `дату «${v}» не вдалося розпізнати (очікується РРРР-ММ-ДД).`,\n    ['виправте дату в полі «Termination date», і автоматизація обробить заявку сама.']],\n  no_name: v => [`• «Contractor (ENG)»: «${v.eng || ''}».\\n• «Contractor (UKR)»: «${v.ukr || ''}».`,\n    'не вдалося визначити ім\\'я та прізвище працівника, тому шукати його в AD, Google і M365 немає за чим.',\n    ['заповніть «Contractor (ENG)» у форматі «Ім\\'я Прізвище» латиницею.']],\n};\nconst fmt = ([checked, result, next]) =>\n  `⚠ Автоматичний offboarding не виконано.\\n\\nЩо перевірено:\\n${checked}\\n\\nРезультат: ${result}\\n\\n` +\n  `Що робити далі:\\n${next.map((s, i) => `${i + 1}. ${s.charAt(0).toUpperCase()}${s.slice(1)}`).join('\\n')}\\n\\n` +\n  'Заявку залишено відкритою. Нічого в AD, Google і M365 не змінено. Автоматизація перевіряє заявку щодня о 18:00; про ту саму проблему повторно не пише.';\n\n// Виклик з агента («обробити зараз»): обробляємо лише цю заявку, а пам'ять про коментарі решти не чіпаємо (openIds повний)\nconst ONLY = (() => { try { return $('When Called by Agent').isExecuted ? (String($('When Called by Agent').first().json.ticket_id || '') || null) : null; } catch (e) { return null; } })();\nconst results = [];\nconst openIds = new Set();\nfor (const issue of issues) {\n  if (!issue || !issue.tracker || issue.tracker.id !== 25) continue;\n  const id = issue.id;\n  openIds.add(String(id));\n  if (ONLY && String(id) !== ONLY) continue;\n  const D = parseDate(issue);\n  if (D.date && D.date > today) continue;  // ще не звільнився\n\n  const eng = cfv(issue, ENG_CF_ID, 'Contractor (ENG)');\n  const ukr = cfv(issue, UKR_CF_ID, 'Contractor (UKR)');\n  const pairs = namePairs(eng).length ? namePairs(eng) : namePairs(ukr);\n  const problem = D.reason ? D : (!pairs.length ? { reason: 'no_name', value: { eng, ukr } } : null);\n  if (problem) {\n    const key = 'input:' + problem.reason + ':' + JSON.stringify(problem.value || '');\n    if (state.notified[id] === key) continue;\n    state.notified[id] = key;\n    results.push({ json: { action: 'notify', id, reason: problem.reason, note: fmt(NOTES[problem.reason](problem.value)) } });\n    continue;\n  }\n  if (String(state.notified[id] || '').startsWith('input:')) delete state.notified[id];\n  const manager = cfv(issue, MANAGER_CF_ID, 'Manager');\n  // Шаблони логінів в AD (запасний пошук, якщо в акаунта не заповнені ім'я/прізвище):\n// ім'я.прізвище, і.прізвище, ms.і.прізвище, ms.ім'я.прізвище (ms. у старих акаунтів).\nconst loginVariants = (g, s) => {\n  const G = g.toLowerCase().replace(/[^a-z-]/g, ''), S = s.toLowerCase().replace(/[^a-z-]/g, '');\n  if (!G || !S) return [];\n  return [`${G}.${S}`, `${G[0]}.${S}`, `ms.${G[0]}.${S}`, `ms.${G}.${S}`];\n};\n  // Значення для шаблону фільтра в LDAP-ноді: фіксовані слоти, зайві = NONE (нічого не знаходить).\n  // Нода сама екранує підставлені значення, тому тут лише прибираємо службові символи.\n  const NONE = '__none__';\n  const ldapClean = s => String(s).replace(/[\\\\*()\\0]/g, '');\n  const pad = (values, n) => {\n    if (values.length > n) throw new Error('Забагато значень для фільтра AD, ' + values.length + ' з ' + n);\n    return values.concat(Array(n - values.length).fill(NONE));\n  };\n  results.push({ json: {\n    action: 'process', id, subject: issue.subject || '', leaver_date: D.date,\n    person: eng || ukr, pairs, drive: parseDrive(issue.description, manager === '-' ? '' : manager),\n    login_variants: [...new Set(pairs.flatMap(([g, s]) => loginVariants(g, s)))],\n    ldap_gn: pad(pairs.map(p => ldapClean(p[0])), 4),\n    ldap_sn: pad(pairs.map(p => ldapClean(p[1])), 4),\n    ldap_sam: pad([...new Set(pairs.flatMap(([g, s]) => loginVariants(g, s)).map(ldapClean).filter(Boolean))], 16),\n  } });\n}\nfor (const k of Object.keys(state.notified)) if (!openIds.has(k)) delete state.notified[k];\nreturn results;\n"
       },
       "id": "f5d53220-5131-57fb-b1f8-f9c2d1b4fc3f",
       "name": "Code: Parse Tickets",
@@ -452,7 +452,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Результат кроку Google (призупинення або пропуск), стан заявки з історії коментарів і запит пошуку отримувача диска.\n// Стан: техніка, підтвердження передачі диска («так» після питання бота), попередні звіти бота.\n// Нотатки бота впізнаємо за «Автоматичний offboarding» (старий флоу писав «Автоматичний Offboarding»).\nconst ctx = $('Code: Decide Google Action').first().json;\nconst r = $input.first().json;\nconst google = { ...ctx.google };\nif (google.status === 'suspend') {\n  const code = Number(r.statusCode);\n  if (code >= 200 && code < 300 && r.body && r.body.suspended === true) google.result = 'suspended';\n  else { google.result = 'error'; google.error = `${code || 'немає відповіді'}: ${(r.body && r.body.error && r.body.error.message) || (r.error && r.error.message) || 'акаунт не призупинено'}`; }\n} else google.result = google.status;\n\nconst t = $('[Redmine] Get Ticket History').first().json;\nconst issue = t.issue || t;\nconst journals = (issue.journals || []).filter(j => j && j.notes);\nconst isBot = n => /Автоматичний\\s+offboarding/i.test(n);\n\n// Техніка: вирішує останній людський коментар про техніку (старий бот брехав «Заборгованості немає», його не рахуємо).\n// \\p{L} з прапорцем u: без нього \\w і \\b у JS не бачать кирилицю.\nconst EQ_OK = /забор\\p{L}*\\s+по\\s+техн\\p{L}*\\s+нема|техн\\p{L}*\\s+(повернуто|повернув|повернула|здано|здав|здала)|нічого\\s+не\\s+числиться/iu;\nconst EQ_DEBT = /(закріплен\\p{L}*|числиться|не\\s+поверну\\p{L}*|не\\s+здан\\p{L}*)[^\\r\\n]{0,40}(ноут|техн|монітор|комп|пк|телефон|гарнітур|інв)/iu;\nlet equipment = 'unknown', equipment_note = '';\nfor (const j of journals) {\n  if (isBot(j.notes)) continue;\n  if (EQ_DEBT.test(j.notes)) { equipment = 'debt'; equipment_note = j.notes.trim(); }\n  else if (EQ_OK.test(j.notes)) { equipment = 'ok'; equipment_note = j.notes.trim(); }\n}\n\n// Передача диска: питання бота «Передати диск ... (email)?» і пізніша людська відповідь «так».\nlet asked_email = '', confirmed_email = '', drive_done_before = false;\nfor (const j of journals) {\n  if (isBot(j.notes)) {\n    const q = j.notes.match(/Передати\\s+диск[^\\r\\n]*?\\(([^)\\s]+@[^)\\s]+)\\)\\?/i);\n    if (q) { asked_email = q[1].toLowerCase(); confirmed_email = ''; }\n    if (/•\\s*Диск:\\s*перенесення\\s+запущено/i.test(j.notes)) drive_done_before = true;  // рядок зі звіту final_report.js\n    if (/Google\\s+Диск[\\s\\S]{0,400}?Успішно\\s+ініційовано/i.test(j.notes)) drive_done_before = true;  // звіт старого флоу\n  } else if (asked_email && /^\\s*(так|да|yes|ок|ok|\\+|підтверджую)(?=$|[\\s.,!)])/iu.test(j.notes)) {\n    confirmed_email = asked_email;\n  }\n}\n\nconst prior_report = journals.some(j => isBot(j.notes) && /(успішно\\s+завершено|Звіт\\s+про\\s+закриття\\s+доступів)/i.test(j.notes));\n\n\nconst merged = { ...ctx, google, equipment, equipment_note, asked_email, confirmed_email, drive_done_before, prior_report };\n\n// Кого шукати в Google як отримувача диска. Без запиту, якщо передавати не треба або акаунта працівника немає.\nconst d = ctx.drive || {};\nconst base = 'https://admin.googleapis.com/admin/directory/v1/users';\nconst q = s => `'${String(s).replace(/'/g, \"\\\\'\")}'`;\nconst leaverOk = ['suspended', 'already_suspended'].includes(google.result);\nlet urls = [];\nif (leaverOk && !drive_done_before) {\n  if (d.mode === 'email') urls = [`${base}/${encodeURIComponent(d.email)}`];\n  else if (['name', 'manager'].includes(d.mode)) {\n    urls = confirmed_email ? [`${base}/${encodeURIComponent(confirmed_email)}`]\n      : d.pairs.map(([g, s]) => `${base}?customer=my_customer&maxResults=10&query=` + encodeURIComponent(`givenName:${q(g)} familyName:${q(s)}`));\n  }\n}\nreturn (urls.length ? urls : ['']).map(url => ({ json: { ...merged, url }, pairedItem: { item: 0 } }));\n"
+        "jsCode": "// Результат кроку Google (призупинення або пропуск), стан заявки з історії коментарів і запит пошуку отримувача диска.\n// Стан: техніка, підтвердження передачі диска («так» після питання бота), попередні звіти бота.\n// Нотатки бота впізнаємо за «Автоматичний offboarding» (старий флоу писав «Автоматичний Offboarding»).\nconst ctx = $('Code: Decide Google Action').first().json;\nconst r = $input.first().json;\nconst google = { ...ctx.google };\nif (google.status === 'suspend') {\n  const code = Number(r.statusCode);\n  if (code >= 200 && code < 300 && r.body && r.body.suspended === true) google.result = 'suspended';\n  else { google.result = 'error'; google.error = `${code || 'немає відповіді'}: ${(r.body && r.body.error && r.body.error.message) || (r.error && r.error.message) || 'акаунт не призупинено'}`; }\n} else google.result = google.status;\n\nconst t = $('[Redmine] Get Ticket History').first().json;\nconst issue = t.issue || t;\nconst journals = (issue.journals || []).filter(j => j && j.notes);\nconst isBot = n => /Автоматичний\\s+offboarding/i.test(n);\n\n// Техніка: останній коментар про техніку (IT або флоу перевірки техніки в GLPI), див. src/equipment_state.js.\n// ===== Стан техніки з коментарів заявки: спільний код флоу offboarding, збірка вставляє його замість рядка «// @@equipment». =====\n// Вирішує останній коментар про техніку: людини з IT або флоу перевірки техніки («Перевірка техніки (GLPI): ...»).\n// Звіти самого offboarding («Автоматичний offboarding») не рахуємо: старий бот писав там «Заборгованості немає».\n// \\p{L} з прапорцем u: без нього \\w і \\b у JS не бачать кирилицю.\nconst EQ_OK = /забор\\p{L}*\\s+по\\s+техн\\p{L}*\\s+нема|техн\\p{L}*\\s+(повернуто|повернув|повернула|здано|здав|здала)|нічого\\s+не\\s+числиться/iu;\nconst EQ_DEBT = /(закріплен\\p{L}*|числиться|не\\s+поверну\\p{L}*|не\\s+здан\\p{L}*)[^\\r\\n]{0,40}(ноут|техн|монітор|комп|пк|телефон|гарнітур|інв)/iu;\nconst EQ_GLPI = /^\\s*Перевірка\\s+техніки\\s+\\(GLPI\\)/iu;  // коментар флоу перевірки техніки без висновку = «невідомо»\nfunction equipmentState(journals) {\n  let equipment = 'unknown', equipment_note = '';\n  for (const j of journals || []) {\n    if (!j || !j.notes || /Автоматичний\\s+offboarding/i.test(j.notes)) continue;\n    if (EQ_DEBT.test(j.notes)) { equipment = 'debt'; equipment_note = j.notes.trim(); }\n    else if (EQ_OK.test(j.notes)) { equipment = 'ok'; equipment_note = j.notes.trim(); }\n    else if (EQ_GLPI.test(j.notes)) { equipment = 'unknown'; equipment_note = j.notes.trim(); }\n  }\n  return { equipment, equipment_note };\n}\n// ===== кінець стану техніки =====\nconst { equipment, equipment_note } = equipmentState(journals);\n\n// Передача диска: питання бота «Передати диск ... (email)?» і пізніша людська відповідь «так».\nlet asked_email = '', confirmed_email = '', drive_done_before = false;\nfor (const j of journals) {\n  if (isBot(j.notes)) {\n    const q = j.notes.match(/Передати\\s+диск[^\\r\\n]*?\\(([^)\\s]+@[^)\\s]+)\\)\\?/i);\n    if (q) { asked_email = q[1].toLowerCase(); confirmed_email = ''; }\n    if (/•\\s*Диск:\\s*перенесення\\s+запущено/i.test(j.notes)) drive_done_before = true;  // рядок зі звіту final_report.js\n    if (/Google\\s+Диск[\\s\\S]{0,400}?Успішно\\s+ініційовано/i.test(j.notes)) drive_done_before = true;  // звіт старого флоу\n  } else if (asked_email && /^\\s*(так|да|yes|ок|ok|\\+|підтверджую)(?=$|[\\s.,!)])/iu.test(j.notes)) {\n    confirmed_email = asked_email;\n  }\n}\n\nconst prior_report = journals.some(j => isBot(j.notes) && /(успішно\\s+завершено|Звіт\\s+про\\s+закриття\\s+доступів)/i.test(j.notes));\n\n\nconst merged = { ...ctx, google, equipment, equipment_note, asked_email, confirmed_email, drive_done_before, prior_report };\n\n// Кого шукати в Google як отримувача диска. Без запиту, якщо передавати не треба або акаунта працівника немає.\nconst d = ctx.drive || {};\nconst base = 'https://admin.googleapis.com/admin/directory/v1/users';\nconst q = s => `'${String(s).replace(/'/g, \"\\\\'\")}'`;\nconst leaverOk = ['suspended', 'already_suspended'].includes(google.result);\nlet urls = [];\nif (leaverOk && !drive_done_before) {\n  if (d.mode === 'email') urls = [`${base}/${encodeURIComponent(d.email)}`];\n  else if (['name', 'manager'].includes(d.mode)) {\n    urls = confirmed_email ? [`${base}/${encodeURIComponent(confirmed_email)}`]\n      : d.pairs.map(([g, s]) => `${base}?customer=my_customer&maxResults=10&query=` + encodeURIComponent(`givenName:${q(g)} familyName:${q(s)}`));\n  }\n}\nreturn (urls.length ? urls : ['']).map(url => ({ json: { ...merged, url }, pairedItem: { item: 0 } }));\n"
       },
       "id": "b7e117b4-058e-5004-b6de-b735220a37eb",
       "name": "Code: Prepare Drive Transfer",
@@ -736,7 +736,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Підсумок по заявці: звіт по кожній системі, техніка, диск, звірка логінів; рішення, чи закривати.\n// Закриваємо лише коли: немає проблем, диск вирішено, IT підтвердив «Заборгованості по техніці немає».\n// Якщо доступи закрито раніше і зараз нічого не змінено: короткий коментар. Той самий коментар двічі не пишемо.\nconst c0 = $('Code: Decide M365 Action').first().json;\nconst r = $input.first().json;\nconst m365 = { ...c0.m365 };\nif (m365.status === 'delete') {\n  const code = Number(r.statusCode);\n  if (code >= 200 && code < 300) m365.result = 'deleted';\n  else { m365.result = 'error'; m365.error = `${code || 'немає відповіді'}: ${(r.body && r.body.error && r.body.error.message) || 'не видалено'}`; }\n} else m365.result = m365.status;\nconst c = { ...c0, m365 };\nconst state = $getWorkflowStaticData('global');\nstate.notified = state.notified || {};\nconst who = c.pairs[0].join(' ');\nconst problems = [], pending = [];\nconst ign = c.ad.ignored_disabled ? ` (інші акаунти з таким іменем уже заблоковані й пропущені: ${c.ad.ignored_disabled})` : '';\nconst pat = (c.ad.by_login_pattern ? ' (ім’я/прізвище в AD не заповнені, знайдено за шаблоном логіна)' : '') + ign;\n\nconst AD = {\n  disabled: () => `Акаунт ${c.ad.login} заблоковано та переміщено в OU «Уволенные».${pat}`,\n  already_done: () => `Акаунт ${c.ad.login} уже був заблокований (OU «Уволенные»).${pat}`,\n  not_found: () => `Акаунт за ім'ям «${who}» не знайдено (можливо, вже видалено).`,\n  multiple: () => { problems.push('AD: кілька акаунтів'); return `Знайдено кілька акаунтів: ${c.ad.candidates}. Нічого не змінено, визначте потрібний вручну.`; },\n  outside_scope: () => { problems.push('AD: акаунт поза OU=AllUsers'); return `Акаунт знайдено поза OU=AllUsers (${c.ad.dn}). Нічого не змінено, потрібна ручна перевірка.`; },\n  fired_but_enabled: () => { problems.push('AD: у «Уволенные», але активний'); return `Акаунт ${c.ad.login} уже в OU «Уволенные», але не заблокований. Заблокуйте вручну.`; },\n  error: () => { problems.push('AD: помилка'); return `НЕ виконано (${c.ad.error}). Перевірте права сервісного облікового запису n8n в AD.`; },\n};\nconst GOOGLE = {\n  suspended: () => `Акаунт ${c.google.email} призупинено (Suspended).`,\n  already_suspended: () => `Акаунт ${c.google.email} уже був призупинений.`,\n  not_found: () => { problems.push('Google: акаунт не знайдено'); return `Акаунт за ім'ям «${who}» не знайдено. Якщо ім'я в Google записане інакше, призупиніть акаунт вручну; якщо акаунт уже видалено, закрийте заявку вручну.`; },\n  multiple: () => { problems.push('Google: кілька акаунтів'); return `Знайдено кілька акаунтів: ${c.google.candidates}. Нічого не змінено, визначте потрібний вручну.`; },\n  error: () => { problems.push('Google: помилка'); return `НЕ виконано (${c.google.error}).`; },\n};\nconst d = c.drive;\nconst DRIVE = {\n  transferred: () => `• Диск: перенесення запущено (кому: ${d.recipient_name}, ${d.recipient_email}).`,\n  done_before: () => '• Диск: перенесення було запущено раніше.',\n  not_needed: () => `• Диск: передавати не потрібно (у заявці: «${d.text}»).`,\n  ask: () => { pending.push('підтвердження передачі диска');\n    return `• Передати диск: ${d.recipient_name} (${d.recipient_email})?\\n  У заявці: «${d.text}». Якщо так, дайте відповідь коментарем «так», і автоматизація передасть диск під час наступного запуску.`; },\n  recipient_not_found: () => { pending.push('отримувач диска');\n    return `• Диск: отримувача ${d.email} не знайдено в Google (або він призупинений). Вкажіть актуальний e-mail у рядку «Переадресація диску: ...».`; },\n  recipient_name_not_found: () => { pending.push('отримувач диска');\n    return `• Диск: кому передати, вказано як «${d.text}», але в Google такого працівника не знайдено. Вкажіть e-mail у рядку «Переадресація диску: ...».`; },\n  recipient_multiple: () => { pending.push('отримувач диска');\n    return `• Диск: за «${d.text}» знайдено кількох: ${d.candidates}. Вкажіть e-mail у рядку «Переадресація диску: ...».`; },\n  unknown_target: () => { pending.push('отримувач диска');\n    return `• Диск: не зрозуміло, кому передати (у заявці: «${d.text}»). Вкажіть e-mail у рядку «Переадресація диску: ...» або напишіть «не потрібно».`; },\n  no_leaver_account: () => '• Диск: не виконувалось (акаунт Google працівника не знайдено).',\n  error: () => { problems.push('Google Диск: помилка'); return `• Диск: перенесення НЕ запущено (${d.error}).`; },\n};\nconst M365 = {\n  deleted: () => `Акаунт ${c.m365.upn} видалено.`,\n  not_found: () => `Акаунта за ім'ям «${who}» немає, видаляти нічого.`,\n  multiple: () => { problems.push('M365: кілька акаунтів'); return `Знайдено кілька акаунтів: ${c.m365.candidates}. Нічого не видалено, визначте потрібний вручну.`; },\n  error: () => { problems.push('M365: помилка'); return `НЕ виконано (${c.m365.error}).`; },\n};\nlet eq;\nif (c.equipment === 'ok') eq = 'IT підтвердив: заборгованості по техніці немає.';\nelse if (c.equipment === 'debt') { pending.push('повернення техніки'); eq = `За працівником числиться техніка (коментар у заявці: «${c.equipment_note.slice(0, 200)}»).`; }\nelse { pending.push('підтвердження IT щодо техніки'); eq = 'Підтвердження IT щодо техніки ще немає. Коли техніку перевірено, напишіть коментар «Заборгованості по техніці немає».'; }\n\nconst lines = {\n  ad: AD[c.ad.result](), google: GOOGLE[c.google.result](), drive: DRIVE[d.result](), m365: M365[c.m365.result](),\n};\n// Звірка логінів між системами: різні логіни можуть означати, що знайдено різних людей.\nconst logins = [c.ad.login, (c.google.email || '').split('@')[0], (c.m365.upn || '').split('@')[0]].filter(Boolean).map(s => s.toLowerCase());\nconst warn = new Set(logins).size > 1 ? `\\n⚠ Логіни в системах відрізняються (${[...new Set(logins)].join(', ')}). Перевірте, що це одна й та сама людина.\\n` : '';\n\nconst close = !problems.length && !pending.length;\nconst acted = c.ad.result === 'disabled' || c.google.result === 'suspended' || d.result === 'transferred' || c.m365.result === 'deleted';\nconst tail = 'Автоматизація перевіряє заявку щодня о 18:00; той самий коментар повторно не пише.';\n\nlet note;\nif (c.prior_report && !acted && !problems.length) {\n  note = close\n    ? 'Автоматичний offboarding: доступи закрито раніше (див. попередній звіт). IT підтвердив, що заборгованості по техніці немає. Заявку закрито.'\n    : `Автоматичний offboarding: доступи закрито раніше (див. попередній звіт), повторно нічого не виконувалось.\\nЗаявку залишено відкритою, бо очікується: ${pending.join(', ')}.\\n${eq}\\n${['ask', 'recipient_not_found', 'recipient_name_not_found', 'recipient_multiple', 'unknown_target'].includes(d.result) ? lines.drive + '\\n' : ''}\\n${tail}`;\n} else {\n  const head = close ? 'Автоматичний offboarding: доступи закрито, заявку закрито.'\n    : problems.length ? '⚠ Автоматичний offboarding виконано частково, потрібна ручна дія.'\n    : 'Автоматичний offboarding: доступи закрито, заявку залишено відкритою.';\n  note = `${head}\\n\\nЗвіт про закриття доступів (працівник: ${c.person}):\\n` +\n    `1. Active Directory: ${lines.ad}\\n2. Google Workspace: ${lines.google}\\n${lines.drive}\\n3. Microsoft 365: ${lines.m365}\\n4. Техніка: ${eq}\\n` + warn +\n    (close ? '\\nЗапис додано до архівного реєстру Google Sheets.' :\n      `\\nЩо залишилось: ${[...problems, ...pending].join('; ')}.\\nЗаявку залишено відкритою. ${tail}`);\n}\n\nconst key = (close ? 'close|' : 'open|') + note.replace(/\\d{4}-\\d{2}-\\d{2}/g, '');\nconst notify = close || state.notified[c.id] !== key;\nif (close) delete state.notified[c.id]; else state.notified[c.id] = key;\n\n// В архів пишемо лише при першому закритті (не після переоткриття заявки).\nreturn [{ json: { id: c.id, close, archive: close && !c.prior_report, notify, note, leaver_date: c.leaver_date,\n  login: c.ad.login || c.google.email || c.person, google_email: c.google.email || '' }, pairedItem: { item: 0 } }];\n"
+        "jsCode": "// Підсумок по заявці: звіт по кожній системі, техніка, диск, звірка логінів; рішення, чи закривати.\n// Закриваємо лише коли: немає проблем, диск вирішено, IT підтвердив «Заборгованості по техніці немає».\n// Якщо доступи закрито раніше і зараз нічого не змінено: короткий коментар. Той самий коментар двічі не пишемо.\nconst c0 = $('Code: Decide M365 Action').first().json;\nconst r = $input.first().json;\nconst m365 = { ...c0.m365 };\nif (m365.status === 'delete') {\n  const code = Number(r.statusCode);\n  if (code >= 200 && code < 300) m365.result = 'deleted';\n  else { m365.result = 'error'; m365.error = `${code || 'немає відповіді'}: ${(r.body && r.body.error && r.body.error.message) || 'не видалено'}`; }\n} else m365.result = m365.status;\nconst c = { ...c0, m365 };\nconst state = $getWorkflowStaticData('global');\nstate.notified = state.notified || {};\nconst who = c.pairs[0].join(' ');\nconst problems = [], pending = [];\nconst ign = c.ad.ignored_disabled ? ` (інші акаунти з таким іменем уже заблоковані й пропущені: ${c.ad.ignored_disabled})` : '';\nconst pat = (c.ad.by_login_pattern ? ' (ім’я/прізвище в AD не заповнені, знайдено за шаблоном логіна)' : '') + ign;\n\nconst AD = {\n  disabled: () => `Акаунт ${c.ad.login} заблоковано та переміщено в OU «Уволенные».${pat}`,\n  already_done: () => `Акаунт ${c.ad.login} уже був заблокований (OU «Уволенные»).${pat}`,\n  not_found: () => `Акаунт за ім'ям «${who}» не знайдено (можливо, вже видалено).`,\n  multiple: () => { problems.push('AD: кілька акаунтів'); return `Знайдено кілька акаунтів: ${c.ad.candidates}. Нічого не змінено, визначте потрібний вручну.`; },\n  outside_scope: () => { problems.push('AD: акаунт поза OU=AllUsers'); return `Акаунт знайдено поза OU=AllUsers (${c.ad.dn}). Нічого не змінено, потрібна ручна перевірка.`; },\n  fired_but_enabled: () => { problems.push('AD: у «Уволенные», але активний'); return `Акаунт ${c.ad.login} уже в OU «Уволенные», але не заблокований. Заблокуйте вручну.`; },\n  error: () => { problems.push('AD: помилка'); return `НЕ виконано (${c.ad.error}). Перевірте права сервісного облікового запису n8n в AD.`; },\n};\nconst GOOGLE = {\n  suspended: () => `Акаунт ${c.google.email} призупинено (Suspended).`,\n  already_suspended: () => `Акаунт ${c.google.email} уже був призупинений.`,\n  not_found: () => { problems.push('Google: акаунт не знайдено'); return `Акаунт за ім'ям «${who}» не знайдено. Якщо ім'я в Google записане інакше, призупиніть акаунт вручну; якщо акаунт уже видалено, закрийте заявку вручну.`; },\n  multiple: () => { problems.push('Google: кілька акаунтів'); return `Знайдено кілька акаунтів: ${c.google.candidates}. Нічого не змінено, визначте потрібний вручну.`; },\n  error: () => { problems.push('Google: помилка'); return `НЕ виконано (${c.google.error}).`; },\n};\nconst d = c.drive;\nconst DRIVE = {\n  transferred: () => `• Диск: перенесення запущено (кому: ${d.recipient_name}, ${d.recipient_email}).`,\n  done_before: () => '• Диск: перенесення було запущено раніше.',\n  not_needed: () => `• Диск: передавати не потрібно (у заявці: «${d.text}»).`,\n  ask: () => { pending.push('підтвердження передачі диска');\n    return `• Передати диск: ${d.recipient_name} (${d.recipient_email})?\\n  У заявці: «${d.text}». Якщо так, дайте відповідь коментарем «так», і автоматизація передасть диск під час наступного запуску.`; },\n  recipient_not_found: () => { pending.push('отримувач диска');\n    return `• Диск: отримувача ${d.email} не знайдено в Google (або він призупинений). Вкажіть актуальний e-mail у рядку «Переадресація диску: ...».`; },\n  recipient_name_not_found: () => { pending.push('отримувач диска');\n    return `• Диск: кому передати, вказано як «${d.text}», але в Google такого працівника не знайдено. Вкажіть e-mail у рядку «Переадресація диску: ...».`; },\n  recipient_multiple: () => { pending.push('отримувач диска');\n    return `• Диск: за «${d.text}» знайдено кількох: ${d.candidates}. Вкажіть e-mail у рядку «Переадресація диску: ...».`; },\n  unknown_target: () => { pending.push('отримувач диска');\n    return `• Диск: не зрозуміло, кому передати (у заявці: «${d.text}»). Вкажіть e-mail у рядку «Переадресація диску: ...» або напишіть «не потрібно».`; },\n  no_leaver_account: () => '• Диск: не виконувалось (акаунт Google працівника не знайдено).',\n  error: () => { problems.push('Google Диск: помилка'); return `• Диск: перенесення НЕ запущено (${d.error}).`; },\n};\nconst M365 = {\n  deleted: () => `Акаунт ${c.m365.upn} видалено.`,\n  not_found: () => `Акаунта за ім'ям «${who}» немає, видаляти нічого.`,\n  multiple: () => { problems.push('M365: кілька акаунтів'); return `Знайдено кілька акаунтів: ${c.m365.candidates}. Нічого не видалено, визначте потрібний вручну.`; },\n  error: () => { problems.push('M365: помилка'); return `НЕ виконано (${c.m365.error}).`; },\n};\nlet eq;\n// Коментар про техніку пише IT або флоу перевірки техніки в GLPI («Перевірка техніки (GLPI): ...»).\nconst byGlpi = /^\\s*Перевірка\\s+техніки\\s+\\(GLPI\\)/i.test(c.equipment_note);\nif (c.equipment === 'ok') eq = byGlpi ? 'Перевірка в GLPI: заборгованості по техніці немає.' : 'IT підтвердив: заборгованості по техніці немає.';\nelse if (c.equipment === 'debt') { pending.push('повернення техніки'); eq = `За працівником числиться техніка (коментар у заявці: «${c.equipment_note.slice(0, byGlpi ? 600 : 200)}»).`; }\nelse { pending.push('підтвердження IT щодо техніки'); eq = 'Підтвердження IT щодо техніки ще немає' + (byGlpi ? ' (у GLPI відповіді немає, див. коментар «Перевірка техніки (GLPI)»)' : '') +\n  '. Коли техніку перевірено, напишіть коментар «Заборгованості по техніці немає».'; }\n\nconst lines = {\n  ad: AD[c.ad.result](), google: GOOGLE[c.google.result](), drive: DRIVE[d.result](), m365: M365[c.m365.result](),\n};\n// Звірка логінів між системами: різні логіни можуть означати, що знайдено різних людей.\nconst logins = [c.ad.login, (c.google.email || '').split('@')[0], (c.m365.upn || '').split('@')[0]].filter(Boolean).map(s => s.toLowerCase());\nconst warn = new Set(logins).size > 1 ? `\\n⚠ Логіни в системах відрізняються (${[...new Set(logins)].join(', ')}). Перевірте, що це одна й та сама людина.\\n` : '';\n\nconst close = !problems.length && !pending.length;\nconst acted = c.ad.result === 'disabled' || c.google.result === 'suspended' || d.result === 'transferred' || c.m365.result === 'deleted';\nconst tail = 'Автоматизація перевіряє заявку щодня о 18:00; той самий коментар повторно не пише.';\n\nlet note;\nif (c.prior_report && !acted && !problems.length) {\n  note = close\n    ? 'Автоматичний offboarding: доступи закрито раніше (див. попередній звіт). IT підтвердив, що заборгованості по техніці немає. Заявку закрито.'\n    : `Автоматичний offboarding: доступи закрито раніше (див. попередній звіт), повторно нічого не виконувалось.\\nЗаявку залишено відкритою, бо очікується: ${pending.join(', ')}.\\n${eq}\\n${['ask', 'recipient_not_found', 'recipient_name_not_found', 'recipient_multiple', 'unknown_target'].includes(d.result) ? lines.drive + '\\n' : ''}\\n${tail}`;\n} else {\n  const head = close ? 'Автоматичний offboarding: доступи закрито, заявку закрито.'\n    : problems.length ? '⚠ Автоматичний offboarding виконано частково, потрібна ручна дія.'\n    : 'Автоматичний offboarding: доступи закрито, заявку залишено відкритою.';\n  note = `${head}\\n\\nЗвіт про закриття доступів (працівник: ${c.person}):\\n` +\n    `1. Active Directory: ${lines.ad}\\n2. Google Workspace: ${lines.google}\\n${lines.drive}\\n3. Microsoft 365: ${lines.m365}\\n4. Техніка: ${eq}\\n` + warn +\n    (close ? '\\nЗапис додано до архівного реєстру Google Sheets.' :\n      `\\nЩо залишилось: ${[...problems, ...pending].join('; ')}.\\nЗаявку залишено відкритою. ${tail}`);\n}\n\nconst key = (close ? 'close|' : 'open|') + note.replace(/\\d{4}-\\d{2}-\\d{2}/g, '');\nconst notify = close || state.notified[c.id] !== key;\nif (close) delete state.notified[c.id]; else state.notified[c.id] = key;\n\n// В архів пишемо лише при першому закритті (не після переоткриття заявки).\nreturn [{ json: { id: c.id, close, archive: close && !c.prior_report, notify, note, leaver_date: c.leaver_date,\n  login: c.ad.login || c.google.email || c.person, google_email: c.google.email || '' }, pairedItem: { item: 0 } }];\n"
       },
       "id": "1c4a7d49-8211-50a8-bb12-c966e6d92823",
       "name": "Code: Build Report",
@@ -941,6 +941,237 @@
         0,
         -780
       ]
+    },
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "id": "9ec3af2f-c042-5dad-91c9-1ea7a55bdacc",
+      "name": "When Called by Agent",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        172
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "row",
+        "operation": "insert",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "<AUDIT_TABLE>"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "matchingColumns": [],
+          "value": {
+            "ticket_id": "={{ $('Update Ticket Needed?').item.json.id }}",
+            "kind": "offboarding_admin",
+            "logins": "={{ $('Update Ticket Needed?').item.json.login || '' }}",
+            "outcome": "={{ $('Update Ticket Needed?').item.json.close ? 'closed' : 'commented' }}",
+            "dry_run": "={{ false }}",
+            "details": "={{ String($('Update Ticket Needed?').item.json.note || '').slice(0, 300) }}",
+            "at": "={{ $now.toISO() }}",
+            "payload": ""
+          },
+          "schema": [
+            {
+              "id": "ticket_id",
+              "displayName": "ticket_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "kind",
+              "displayName": "kind",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "logins",
+              "displayName": "logins",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "outcome",
+              "displayName": "outcome",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "dry_run",
+              "displayName": "dry_run",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "details",
+              "displayName": "details",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "at",
+              "displayName": "at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "payload",
+              "displayName": "payload",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "f4fbf8b7-6017-5d43-93f6-5b06b5660d73",
+      "name": "[Data Table] Log Result",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        1500,
+        920
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "resource": "row",
+        "operation": "insert",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "<AUDIT_TABLE>"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "matchingColumns": [],
+          "value": {
+            "ticket_id": "={{ $('Ticket Ready?').item.json.id }}",
+            "kind": "offboarding_admin",
+            "logins": "={{ $('Ticket Ready?').item.json.login || '' }}",
+            "outcome": "missing_data",
+            "dry_run": "={{ false }}",
+            "details": "={{ String($('Ticket Ready?').item.json.note || '').slice(0, 300) }}",
+            "at": "={{ $now.toISO() }}",
+            "payload": ""
+          },
+          "schema": [
+            {
+              "id": "ticket_id",
+              "displayName": "ticket_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "kind",
+              "displayName": "kind",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "logins",
+              "displayName": "logins",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "outcome",
+              "displayName": "outcome",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "dry_run",
+              "displayName": "dry_run",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "details",
+              "displayName": "details",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "at",
+              "displayName": "at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "payload",
+              "displayName": "payload",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "9185753d-4033-5475-97b8-b391b9c27a5b",
+      "name": "[Data Table] Log Missing Data",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        1000,
+        172
+      ],
+      "onError": "continueRegularOutput"
     }
   ],
   "connections": {
@@ -1335,6 +1566,11 @@
       "main": [
         [
           {
+            "node": "[Data Table] Log Result",
+            "type": "main",
+            "index": 0
+          },
+          {
             "node": "Add to Archive?",
             "type": "main",
             "index": 0
@@ -1365,6 +1601,28 @@
         [
           {
             "node": "Loop Over Tickets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When Called by Agent": {
+      "main": [
+        [
+          {
+            "node": "[Redmine] Get Open Leaver Tickets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "[Redmine] Comment Missing Data": {
+      "main": [
+        [
+          {
+            "node": "[Data Table] Log Missing Data",
             "type": "main",
             "index": 0
           }

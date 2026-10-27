@@ -46,8 +46,11 @@ def link(src, dst, out=0):
     m[out].append({"node": dst, "type": "main", "index": 0})
 
 
+EQUIPMENT_JS = (ROOT / "src" / "equipment_state.js").read_text(encoding="utf-8")
+
+
 def code(name, file, part_name, x, y, replace=None):
-    js = part(file, part_name)
+    js = part(file, part_name).replace("// @@equipment\n", EQUIPMENT_JS)
     for k, v in (replace or {}).items():
         js = js.replace(k, v)
     return node(name, "n8n-nodes-base.code", {"jsCode": js}, x, y, version=2)
@@ -203,6 +206,10 @@ link("Add to Archive?", "Loop Over Tickets", 1)
 link("[Sheets] Add to Archive", "Loop Over Tickets")
 
 
+import agent_hooks  # noqa: E402  (вхід від агента і запис у спільний аудит)
+agent_hooks.add(nodes, conns, "admin", "offboarding_admin", "[Redmine] Get Open Leaver Tickets", "[Redmine] Update Ticket",
+                "Add to Archive?", "[Redmine] Comment Missing Data", "Ticket Ready?")
+
 # Розкладка сіткою по етапах: розбір заявок, AD, Google, Диск, M365 і звіт. Лише позиції нод.
 LAYOUT_ROWS = [
     ["Every Day 18:00", "[Redmine] Get Open Leaver Tickets", "Code: Parse Tickets", "Ticket Ready?", "Loop Over Tickets",
@@ -214,7 +221,8 @@ LAYOUT_ROWS = [
     ["[M365] Search User", "Code: Decide M365 Action", "Delete in M365?", "[M365] Delete User", "Code: Build Report",
      "Update Ticket Needed?", "[Redmine] Update Ticket", "Add to Archive?"],
 ]
-LAYOUT_EXTRA = {"[Redmine] Comment Missing Data": (3, 0.75), "[Sheets] Add to Archive": (7, 4)}
+LAYOUT_EXTRA = {"[Redmine] Comment Missing Data": (3, 0.75), "[Sheets] Add to Archive": (7, 4),
+                agent_hooks.TRIGGER: (0, 0.75), agent_hooks.LOG: (6, 4), agent_hooks.LOG_MISSING: (4, 0.75)}
 
 POS = {nm: (c, r) for r, row in enumerate(LAYOUT_ROWS) for c, nm in enumerate(row)}
 POS.update(LAYOUT_EXTRA)

@@ -1,0 +1,573 @@
+{
+  "name": "[PROD] Equipment Check on Offboarding (GLPI) / [PROD] Перевірка техніки при звільненні (GLPI)",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "30 * * * *"
+            }
+          ]
+        }
+      },
+      "id": "ac4ef175-48d4-5efe-8515-cf20c12cb5bf",
+      "name": "Every Hour at :30",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "returnAll": true,
+        "filters": {
+          "project_id": "staff-leavers",
+          "status_id": "open"
+        },
+        "options": {}
+      },
+      "id": "06bd1ee7-ee4e-5051-afee-31c65908337d",
+      "name": "[Redmine] Get Open Leaver Tickets",
+      "type": "n8n-nodes-redmine.redmine",
+      "typeVersion": 1,
+      "position": [
+        250,
+        0
+      ],
+      "credentials": {
+        "redmineApi": {
+          "id": "<REDMINE_CRED>",
+          "name": "Redmine bot account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Відкриті заявки на звільнення (трекер 25 «Admin | Leaver» і 41 «GA | Leaver»): хто працівник і запити пошуку в GLPI.\n// Адмін: ім'я з полів «Contractor (ENG)» і «Contractor (UKR)». Лінійний: логін з рядка «AD -» (або поля «AD login») і ПІБ з рядка «ГА -» чи теми.\n// Заявки, де немає ні логіна, ні імені, пропускаємо: шукати в GLPI нема за чим.\n// ===== GLPI (облік техніки): пошук людини і її техніки. Збірка вставляє цей код у Code-ноди замість рядка «// @@glpi». =====\n// Хто людина в GLPI: користувач, у якого логін = логін AD, або прізвище й ім'я з заявки (латиницею чи кирилицею, обидва порядки).\n// Техніка людини: позиції, де поле «Користувач» = цей користувач. Поле «Контакт» (вільний текст: логін@ПК або ПІБ)\n// лише підказка: такі позиції показуємо як «можливо», але самі по собі вони нічого не підтверджують.\n// Пошук GLPI за «містить» знаходить і схожі логіни (a.ivanov -> a.ivanova), тому точний збіг перевіряємо тут.\nconst GLPI_URL = '<GLPI_URL>/apirest.php';\nconst glpiNorm = s => String(s || '').replace(/<[^>]*>/g, '').replace(/[’ʼ`]/g, \"'\").replace(/\\s+/g, ' ').trim().toLowerCase();\n\n// Пари [ім'я, прізвище] для пошуку: з готових латинських пар і з сирих рядків заявки (обидва порядки; для 3+ слів ще перше+останнє).\nfunction glpiPairs(names, pairs) {\n  const out = [];\n  const add = (g, s) => { g = glpiNorm(g); s = glpiNorm(s); if (g && s && !out.some(p => p[0] === g && p[1] === s)) out.push([g, s]); };\n  for (const [g, s] of pairs || []) add(g, s);\n  for (const raw of names || []) {\n    const w = String(raw || '').replace(/^(ФОП|ФЛП)\\s+/i, '').split(/[\\s\\/|,]+/).filter(x => /^[\\p{L}'’ʼ-]{2,}$/u.test(x));\n    if (w.length < 2) continue;\n    add(w[0], w[1]); add(w[1], w[0]);\n    if (w.length >= 3) { add(w[0], w[w.length - 1]); add(w[w.length - 1], w[0]); }\n  }\n  return out.slice(0, 8);\n}\n\n// Два запити: користувачі GLPI (логін або прізвище+ім'я) і техніка (поле «Користувач» або «Контакт» містить логін чи слово з ПІБ).\nfunction glpiUrls(login, names, pairs) {\n  const P = glpiPairs(names, pairs), e = encodeURIComponent;\n  const c = [];\n  const crit = (i, f, v, link) => (link ? `&criteria[${i}][link]=${link}` : '') +\n    `&criteria[${i}][field]=${f}&criteria[${i}][searchtype]=contains&criteria[${i}][value]=${e(v)}`;\n  let i = 0;\n  if (login) c.push(crit(i++, 1, `^${login}$`));\n  for (const [g, s] of P) {\n    c.push(`${i ? `&criteria[${i}][link]=OR` : ''}&criteria[${i}][criteria][0][field]=34&criteria[${i}][criteria][0][searchtype]=contains` +\n      `&criteria[${i}][criteria][0][value]=${e('^' + s + '$')}&criteria[${i}][criteria][1][link]=AND&criteria[${i}][criteria][1][field]=9` +\n      `&criteria[${i}][criteria][1][searchtype]=contains&criteria[${i}][criteria][1][value]=${e('^' + g + '$')}`);\n    i++;\n  }\n  const words = [...new Set([login, ...P.flat()].filter(w => w && w.length >= 3))];\n  const a = [];\n  let j = 0;\n  for (const w of words) { a.push(crit(j, 70, w, j ? 'OR' : '')); j++; a.push(crit(j, 7, w, 'OR')); j++; }\n  return {\n    user_url: c.length ? `${GLPI_URL}/search/User?${c.join('').slice(1)}&forcedisplay[0]=1&forcedisplay[1]=2&forcedisplay[2]=9&forcedisplay[3]=34&uid_cols=true&range=0-50` : '',\n    assets_url: a.length ? `${GLPI_URL}/search/AllAssets?${a.join('').slice(1)}&forcedisplay[0]=1&forcedisplay[1]=5&forcedisplay[2]=6&forcedisplay[3]=7` +\n      '&forcedisplay[4]=23&forcedisplay[5]=31&forcedisplay[6]=70&uid_cols=true&range=0-500' : '',\n  };\n}\n\n// Результат: status = assigned | clear | check | not_in_glpi | ambiguous | error; items (за користувачем), possible (лише «Контакт»).\nfunction glpiCheck(login, names, pairs, session, users, assets) {\n  const P = glpiPairs(names, pairs), L = glpiNorm(login);\n  const bad = r => !r || Number(r.statusCode) !== 200 || !r.body;\n  const why = r => `${(r && r.statusCode) || 'немає відповіді'}${r && r.body ? ': ' + String(JSON.stringify(r.body)).slice(0, 120) : ''}`;\n  if (bad(session)) return { status: 'error', error: 'вхід у GLPI ' + why(session), items: [], possible: [] };\n  if (bad(users) || bad(assets)) return { status: 'error', error: 'пошук у GLPI ' + why(bad(users) ? users : assets), items: [], possible: [] };\n  const val = (r, k) => glpiNorm(r[k]);\n  const found = (users.body.data || []).filter(u => (L && val(u, 'User.name') === L) ||\n    P.some(([g, s]) => val(u, 'User.realname') === s && val(u, 'User.firstname') === g));\n  const logins = [...new Set(found.map(u => val(u, 'User.name')))];\n  const TYPES = { Computer: \"Комп'ютер\", Monitor: 'Монітор', Peripheral: 'Периферія', Printer: 'Принтер', Phone: 'Телефон', NetworkEquipment: 'Мережеве обладнання' };\n  const line = r => {\n    const f = (k, label) => { const v = String(r[k] || '').replace(/<[^>]*>/g, '').trim(); return v ? `${label}${v}` : ''; };\n    return [`${TYPES[r.itemtype] || r.itemtype} «${String(r['AllAssets..name'] || 'без назви').replace(/<[^>]*>/g, '').trim()}»`,\n      f('AllAssets..otherserial', 'інв. № '), f('AllAssets..serial', 'сер. № '), f('AllAssets.Manufacturer.name', ''),\n      f('AllAssets.State.completename', 'статус: '), f('AllAssets..contact', 'контакт: ')].filter(Boolean).join(', ');\n  };\n  const rows = assets.body.data || [];\n  const owner = r => String(r['AllAssets.User.name'] || '').split('$#$').map(glpiNorm);\n  const items = rows.filter(r => owner(r).some(o => logins.includes(o))).map(line);\n  const tokens = r => glpiNorm(r['AllAssets..contact']).split(/[\\s@\\\\\\/,;()]+/).filter(Boolean);\n  const possible = rows.filter(r => !owner(r).some(o => logins.includes(o)))\n    .filter(r => { const t = tokens(r); return (L && t.includes(L)) || P.some(([g, s]) => t.includes(g) && t.includes(s)); }).map(line);\n  const status = logins.length > 1 ? 'ambiguous' : items.length ? 'assigned' : !logins.length ? 'not_in_glpi' : possible.length ? 'check' : 'clear';\n  return { status, glpi_login: logins.join(', '), items: items.slice(0, 20), possible: possible.slice(0, 10), more: Math.max(0, items.length - 20) };\n}\n\n// ===== кінець GLPI =====\nconst TRACKERS = { 25: 'admin', 41: 'linear' };\nconst ENG_CF_ID = 11, UKR_CF_ID = 103, LOGIN_CF_ID = 87;\nconst LOGIN_RE = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;\n\n// Транслітерація за постановою КМУ №55 (2010), як імена записані латиницею в GLPI й AD (Зразковий Олег -> Zrazkovyi Oleh).\nconst TR = { а:'a', б:'b', в:'v', г:'h', ґ:'g', д:'d', е:'e', є:'ie', ж:'zh', з:'z', и:'y', і:'i', ї:'i', й:'i', к:'k', л:'l',\n  м:'m', н:'n', о:'o', п:'p', р:'r', с:'s', т:'t', у:'u', ф:'f', х:'kh', ц:'ts', ч:'ch', ш:'sh', щ:'shch', ь:'', ю:'iu', я:'ia',\n  ы:'y', э:'e', ё:'io', ъ:'' };\nconst TR_START = { є:'ye', ї:'yi', й:'y', ю:'yu', я:'ya', ё:'yo' };\nfunction translit(word) {\n  const w = word.toLowerCase().replace(/[’'ʼ`]/g, '').replace(/зг/g, 'zgh');\n  let out = '';\n  for (let i = 0; i < w.length; i++) out += (i === 0 && TR_START[w[i]]) || (TR[w[i]] !== undefined ? TR[w[i]] : w[i]);\n  return out;\n}\nconst isCyr = w => /^[А-Яа-яЁёЄєІіЇїҐґ’'ʼ-]+$/.test(w);\n// Латинські пари з кириличного імені (обидва порядки); латинські імена glpiPairs розбирає сам.\nconst latinPairs = name => {\n  const w = String(name || '').replace(/^(ФОП|ФЛП)\\s+/i, '').split(/\\s+/).filter(Boolean);\n  if (w.length < 2 || !isCyr(w[0]) || !isCyr(w[1])) return [];\n  const [a, b] = [translit(w[0]), translit(w[1])];\n  return [[a, b], [b, a]];\n};\nconst cf = (issue, id, name) => {\n  const f = (issue.custom_fields || []).find(x => x.id === id || x.name === name);\n  return f && f.value ? String(f.value).trim() : '';\n};\n\nlet issues = [];\nfor (const it of $input.all()) {\n  if (Array.isArray(it.json.issues)) issues.push(...it.json.issues);\n  else if (it.json && it.json.id) issues.push(it.json);\n}\n\n// Виклик з агента (перед «обробити зараз»): перевіряємо лише цю заявку\nconst ONLY = (() => { try { return $('When Called by Agent').isExecuted ? (String($('When Called by Agent').first().json.ticket_id || '') || null) : null; } catch (e) { return null; } })();\nif (ONLY) issues = issues.filter(i => String(i.id) === ONLY);\n\nconst out = [];\nfor (const issue of issues) {\n  const kind = issue && issue.tracker && TRACKERS[issue.tracker.id];\n  if (!kind) continue;\n  let login = '', names = [];\n  if (kind === 'admin') names = [cf(issue, ENG_CF_ID, 'Contractor (ENG)'), cf(issue, UKR_CF_ID, 'Contractor (UKR)')];\n  else {\n    // [ \\t]* замість \\s*, щоб не перескочити на наступний рядок, коли поле порожнє.\n    const m = (issue.description || '').match(/(?:^|[\\s|])AD[ \\t]*[-–—:][ \\t]*([^\\r\\n]*)/i);\n    const raw = ((m && m[1].trim()) || cf(issue, LOGIN_CF_ID, 'AD login')).split(/[\\s@]+/)[0];\n    if (LOGIN_RE.test(raw)) login = raw.toLowerCase();\n    const g = (issue.description || '').match(/(?:^|[\\s|])ГА[ \\t]*[-–—:][ \\t]*([^\\r\\n]*)/);\n    names = [((g && g[1]) || (issue.subject || '').split('|')[2] || '').trim()];\n  }\n  names = names.filter(n => n && n !== '-');\n  const pairs = names.flatMap(latinPairs);\n  const urls = glpiUrls(login, names, pairs);\n  if (!urls.user_url && !urls.assets_url) continue;\n  out.push({ json: { id: issue.id, kind, subject: issue.subject || '', login, names, pairs, ...urls } });\n}\nreturn out;\n"
+      },
+      "id": "51ee4a29-7649-57ff-9bab-a4d9c94f88e6",
+      "name": "Code: Parse Tickets",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        500,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "9805046f-ce28-56bc-82c1-d274cafd42fa",
+      "name": "Loop Over Tickets",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        750,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "issueId": "={{ $json.id }}",
+        "include": [
+          "journals"
+        ],
+        "options": {}
+      },
+      "id": "1bd2b3b3-55e6-53ad-a7f1-f917487ee900",
+      "name": "[Redmine] Get Ticket History",
+      "type": "n8n-nodes-redmine.redmine",
+      "typeVersion": 1,
+      "position": [
+        1000,
+        0
+      ],
+      "credentials": {
+        "redmineApi": {
+          "id": "<REDMINE_CRED>",
+          "name": "Redmine bot account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "<GLPI_URL>/apirest.php/initSession",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpCustomAuth",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          }
+        }
+      },
+      "id": "4a11732e-e5ed-51ee-ac42-c6c9f44c48d8",
+      "name": "[GLPI] Open Session",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        0,
+        230
+      ],
+      "onError": "continueRegularOutput",
+      "credentials": {
+        "httpCustomAuth": {
+          "id": "<GLPI_CRED>",
+          "name": "GLPI API (read-only)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $('Loop Over Tickets').first().json.user_url }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpCustomAuth",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          }
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Session-Token",
+              "value": "={{ ($('[GLPI] Open Session').first().json.body || {}).session_token || '' }}"
+            }
+          ]
+        }
+      },
+      "id": "fdb65a93-38e5-5a20-b99d-ef600dfe1636",
+      "name": "[GLPI] Find User",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        250,
+        230
+      ],
+      "onError": "continueRegularOutput",
+      "credentials": {
+        "httpCustomAuth": {
+          "id": "<GLPI_CRED>",
+          "name": "GLPI API (read-only)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $('Loop Over Tickets').first().json.assets_url }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpCustomAuth",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          }
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Session-Token",
+              "value": "={{ ($('[GLPI] Open Session').first().json.body || {}).session_token || '' }}"
+            }
+          ]
+        }
+      },
+      "id": "4c798379-1ea5-51f7-a2ea-166aa980a967",
+      "name": "[GLPI] Find Assets",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        500,
+        230
+      ],
+      "onError": "continueRegularOutput",
+      "credentials": {
+        "httpCustomAuth": {
+          "id": "<GLPI_CRED>",
+          "name": "GLPI API (read-only)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Результат перевірки GLPI -> коментар у заявку «Перевірка техніки (GLPI): ...». Флоу offboarding читають саме цей коментар:\n// «числиться техніка» = борг (заявку не закривають), «Заборгованості по техніці немає» = техніку перевірено, інше = потрібна перевірка IT.\n// «Немає» пишемо, коли людина є в GLPI і за нею нічого не числиться. Людини в GLPI немає: адмін = перевірка IT,\n// лінійний = теж «немає» (лінійні працюють на своїй техніці й у GLPI їх зазвичай немає; рішення користувача 27.10.2026).\n// Пишемо лише коли висновок змінився (порівнюємо з останнім таким коментарем). Якщо останнє слово про техніку за людиною\n// (IT написав «закріплений ноутбук» чи «заборгованості немає»), мовчимо: рішення вже прийняте людиною.\n// ===== GLPI (облік техніки): пошук людини і її техніки. Збірка вставляє цей код у Code-ноди замість рядка «// @@glpi». =====\n// Хто людина в GLPI: користувач, у якого логін = логін AD, або прізвище й ім'я з заявки (латиницею чи кирилицею, обидва порядки).\n// Техніка людини: позиції, де поле «Користувач» = цей користувач. Поле «Контакт» (вільний текст: логін@ПК або ПІБ)\n// лише підказка: такі позиції показуємо як «можливо», але самі по собі вони нічого не підтверджують.\n// Пошук GLPI за «містить» знаходить і схожі логіни (a.ivanov -> a.ivanova), тому точний збіг перевіряємо тут.\nconst GLPI_URL = '<GLPI_URL>/apirest.php';\nconst glpiNorm = s => String(s || '').replace(/<[^>]*>/g, '').replace(/[’ʼ`]/g, \"'\").replace(/\\s+/g, ' ').trim().toLowerCase();\n\n// Пари [ім'я, прізвище] для пошуку: з готових латинських пар і з сирих рядків заявки (обидва порядки; для 3+ слів ще перше+останнє).\nfunction glpiPairs(names, pairs) {\n  const out = [];\n  const add = (g, s) => { g = glpiNorm(g); s = glpiNorm(s); if (g && s && !out.some(p => p[0] === g && p[1] === s)) out.push([g, s]); };\n  for (const [g, s] of pairs || []) add(g, s);\n  for (const raw of names || []) {\n    const w = String(raw || '').replace(/^(ФОП|ФЛП)\\s+/i, '').split(/[\\s\\/|,]+/).filter(x => /^[\\p{L}'’ʼ-]{2,}$/u.test(x));\n    if (w.length < 2) continue;\n    add(w[0], w[1]); add(w[1], w[0]);\n    if (w.length >= 3) { add(w[0], w[w.length - 1]); add(w[w.length - 1], w[0]); }\n  }\n  return out.slice(0, 8);\n}\n\n// Два запити: користувачі GLPI (логін або прізвище+ім'я) і техніка (поле «Користувач» або «Контакт» містить логін чи слово з ПІБ).\nfunction glpiUrls(login, names, pairs) {\n  const P = glpiPairs(names, pairs), e = encodeURIComponent;\n  const c = [];\n  const crit = (i, f, v, link) => (link ? `&criteria[${i}][link]=${link}` : '') +\n    `&criteria[${i}][field]=${f}&criteria[${i}][searchtype]=contains&criteria[${i}][value]=${e(v)}`;\n  let i = 0;\n  if (login) c.push(crit(i++, 1, `^${login}$`));\n  for (const [g, s] of P) {\n    c.push(`${i ? `&criteria[${i}][link]=OR` : ''}&criteria[${i}][criteria][0][field]=34&criteria[${i}][criteria][0][searchtype]=contains` +\n      `&criteria[${i}][criteria][0][value]=${e('^' + s + '$')}&criteria[${i}][criteria][1][link]=AND&criteria[${i}][criteria][1][field]=9` +\n      `&criteria[${i}][criteria][1][searchtype]=contains&criteria[${i}][criteria][1][value]=${e('^' + g + '$')}`);\n    i++;\n  }\n  const words = [...new Set([login, ...P.flat()].filter(w => w && w.length >= 3))];\n  const a = [];\n  let j = 0;\n  for (const w of words) { a.push(crit(j, 70, w, j ? 'OR' : '')); j++; a.push(crit(j, 7, w, 'OR')); j++; }\n  return {\n    user_url: c.length ? `${GLPI_URL}/search/User?${c.join('').slice(1)}&forcedisplay[0]=1&forcedisplay[1]=2&forcedisplay[2]=9&forcedisplay[3]=34&uid_cols=true&range=0-50` : '',\n    assets_url: a.length ? `${GLPI_URL}/search/AllAssets?${a.join('').slice(1)}&forcedisplay[0]=1&forcedisplay[1]=5&forcedisplay[2]=6&forcedisplay[3]=7` +\n      '&forcedisplay[4]=23&forcedisplay[5]=31&forcedisplay[6]=70&uid_cols=true&range=0-500' : '',\n  };\n}\n\n// Результат: status = assigned | clear | check | not_in_glpi | ambiguous | error; items (за користувачем), possible (лише «Контакт»).\nfunction glpiCheck(login, names, pairs, session, users, assets) {\n  const P = glpiPairs(names, pairs), L = glpiNorm(login);\n  const bad = r => !r || Number(r.statusCode) !== 200 || !r.body;\n  const why = r => `${(r && r.statusCode) || 'немає відповіді'}${r && r.body ? ': ' + String(JSON.stringify(r.body)).slice(0, 120) : ''}`;\n  if (bad(session)) return { status: 'error', error: 'вхід у GLPI ' + why(session), items: [], possible: [] };\n  if (bad(users) || bad(assets)) return { status: 'error', error: 'пошук у GLPI ' + why(bad(users) ? users : assets), items: [], possible: [] };\n  const val = (r, k) => glpiNorm(r[k]);\n  const found = (users.body.data || []).filter(u => (L && val(u, 'User.name') === L) ||\n    P.some(([g, s]) => val(u, 'User.realname') === s && val(u, 'User.firstname') === g));\n  const logins = [...new Set(found.map(u => val(u, 'User.name')))];\n  const TYPES = { Computer: \"Комп'ютер\", Monitor: 'Монітор', Peripheral: 'Периферія', Printer: 'Принтер', Phone: 'Телефон', NetworkEquipment: 'Мережеве обладнання' };\n  const line = r => {\n    const f = (k, label) => { const v = String(r[k] || '').replace(/<[^>]*>/g, '').trim(); return v ? `${label}${v}` : ''; };\n    return [`${TYPES[r.itemtype] || r.itemtype} «${String(r['AllAssets..name'] || 'без назви').replace(/<[^>]*>/g, '').trim()}»`,\n      f('AllAssets..otherserial', 'інв. № '), f('AllAssets..serial', 'сер. № '), f('AllAssets.Manufacturer.name', ''),\n      f('AllAssets.State.completename', 'статус: '), f('AllAssets..contact', 'контакт: ')].filter(Boolean).join(', ');\n  };\n  const rows = assets.body.data || [];\n  const owner = r => String(r['AllAssets.User.name'] || '').split('$#$').map(glpiNorm);\n  const items = rows.filter(r => owner(r).some(o => logins.includes(o))).map(line);\n  const tokens = r => glpiNorm(r['AllAssets..contact']).split(/[\\s@\\\\\\/,;()]+/).filter(Boolean);\n  const possible = rows.filter(r => !owner(r).some(o => logins.includes(o)))\n    .filter(r => { const t = tokens(r); return (L && t.includes(L)) || P.some(([g, s]) => t.includes(g) && t.includes(s)); }).map(line);\n  const status = logins.length > 1 ? 'ambiguous' : items.length ? 'assigned' : !logins.length ? 'not_in_glpi' : possible.length ? 'check' : 'clear';\n  return { status, glpi_login: logins.join(', '), items: items.slice(0, 20), possible: possible.slice(0, 10), more: Math.max(0, items.length - 20) };\n}\n\n// ===== кінець GLPI =====\nconst ctx = $('Loop Over Tickets').first().json;\nconst t = $('[Redmine] Get Ticket History').first().json;\nconst journals = ((t.issue || t).journals || []).filter(j => j && j.notes);\nconst MARK = 'Перевірка техніки (GLPI):';\nconst isOurs = n => n.trim().startsWith(MARK);\nconst isOffboarding = n => /Автоматичний\\s+offboarding/i.test(n);\n// Ті самі ознаки, що в src/equipment_state.js (флоу offboarding).\nconst EQ_OK = /забор\\p{L}*\\s+по\\s+техн\\p{L}*\\s+нема|техн\\p{L}*\\s+(повернуто|повернув|повернула|здано|здав|здала)|нічого\\s+не\\s+числиться/iu;\nconst EQ_DEBT = /(закріплен\\p{L}*|числиться|не\\s+поверну\\p{L}*|не\\s+здан\\p{L}*)[^\\r\\n]{0,40}(ноут|техн|монітор|комп|пк|телефон|гарнітур|інв)/iu;\nconst last = journals.filter(j => isOurs(j.notes) || (!isOffboarding(j.notes) && (EQ_OK.test(j.notes) || EQ_DEBT.test(j.notes)))).pop();\nconst humanDecided = !!last && !isOurs(last.notes);\n\nconst g = glpiCheck(ctx.login, ctx.names, ctx.pairs, $('[GLPI] Open Session').first().json, $('[GLPI] Find User').first().json,\n  $input.first().json);\nconst who = ctx.login || ctx.names[0] || '';\nconst list = xs => xs.map(x => `– ${x}`).join('\\n');\nconst contact = g.possible.length ? `\\nУ полі «Контакт» GLPI згадується «${who}» (перевірте, чи це техніка працівника):\\n${list(g.possible)}` : '';\nconst it = 'Потрібна перевірка IT: перевірте техніку вручну і напишіть результат коментарем.';\nconst TEXT = {\n  assigned: () => `${MARK} за працівником числиться техніка.\\nУ GLPI на користувачі ${g.glpi_login}:\\n${list(g.items)}` +\n    (g.more ? `\\n… і ще ${g.more}` : '') + contact + '\\nПісля повернення зніміть техніку з користувача в GLPI: ця перевірка напише про це сама.',\n  clear: () => `${MARK} Заборгованості по техніці немає.`,\n  check: () => `${MARK} потрібна перевірка IT.\\nКористувач ${g.glpi_login} є в GLPI, позицій на ньому немає.${contact}\\n${it}`,\n  not_in_glpi: () => `${MARK} потрібна перевірка IT.\\nПрацівника «${who}» у GLPI не знайдено (ні за логіном, ні за ім'ям і прізвищем).${contact}\\n${it}`,\n  ambiguous: () => `${MARK} потрібна перевірка IT.\\nУ GLPI під «${who}» підходять кілька користувачів: ${g.glpi_login}.\\n${it}`,\n  error: () => `${MARK} перевірити GLPI не вдалося (${g.error}). Перевірка повториться щогодини.`,\n};\nconst linearNone = ctx.kind === 'linear' && g.status === 'not_in_glpi' && !g.possible.length;\nconst note = linearNone ? TEXT.clear() : TEXT[g.status]();\nconst prev = journals.filter(j => isOurs(j.notes)).pop();\n// Помилку GLPI для лінійних не пишемо: вона не має скасувати попередній висновок «числиться техніка» (наступна перевірка за годину).\nconst quiet = ctx.kind === 'linear' && g.status === 'error';\nconst notify = !humanDecided && !quiet && (!prev || prev.notes.trim() !== note.trim());\nreturn [{ json: { id: ctx.id, kind: ctx.kind, status: g.status, items: g.items.length, human_decided: humanDecided, notify, note },\n  pairedItem: { item: 0 } }];\n"
+      },
+      "id": "0591d3ba-9654-590d-a554-5948855e9bee",
+      "name": "Code: Build Comment",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        750,
+        230
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "e257d2a2-45c1-51a7-9309-92e171954589",
+              "leftValue": "={{ $json.notify }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "da44ac7e-90a7-506f-86fe-b86c31ef2a77",
+      "name": "Comment Needed?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1000,
+        230
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "issueId": "={{ $json.id }}",
+        "notes": "={{ $json.note }}",
+        "additionalFields": {},
+        "options": {}
+      },
+      "id": "84204cb1-dcdb-58e5-aa6e-1305afebb079",
+      "name": "[Redmine] Add Comment",
+      "type": "n8n-nodes-redmine.redmine",
+      "typeVersion": 1,
+      "position": [
+        1250,
+        230
+      ],
+      "credentials": {
+        "redmineApi": {
+          "id": "<REDMINE_CRED>",
+          "name": "Redmine bot account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "## 🖥️ [PROD] Перевірка техніки при звільненні (GLPI)\nЩогодини о :30 (до запуску offboarding о 18:00). Лише читання GLPI, у Redmine лише коментарі.\n\n**Заявки:** відкриті в проєкті staff-leavers, трекери 25 (Admin | Leaver) і 41 (GA | Leaver).\n**Хто людина в GLPI:** логін AD із заявки або прізвище й ім'я (латиницею й кирилицею, обидва порядки); точний збіг перевіряє код.\n**Техніка:** позиції всіх типів, де людина в полі «Користувач». Поле «Контакт» лише підказка.\n\n**Коментар «Перевірка техніки (GLPI): ...»** (його читають флоу offboarding):\n* числиться техніка: перелік (тип, назва, інв. №, серійний, статус); заявку не закривають;\n* людина є в GLPI, нічого не числиться: «Заборгованості по техніці немає»;\n* людини в GLPI немає: лінійний = «Заборгованості по техніці немає» (працюють на своїй техніці), адмін = потрібна перевірка IT;\n* кілька кандидатів, лише «Контакт» або помилка: потрібна перевірка IT (помилку для лінійних не пишемо).\n\nПишемо лише коли висновок змінився. Якщо останнє слово про техніку за людиною з IT, мовчимо.\n**Помилки:** Error Workflow.",
+        "height": 560,
+        "width": 620,
+        "color": 6
+      },
+      "id": "706759c2-0c60-5989-83a3-77755cdd3dc8",
+      "name": "Sticky Note: Overview",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        0,
+        -640
+      ]
+    },
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "id": "6804dca6-c4e9-53c1-be0d-bd606cde9dc6",
+      "name": "When Called by Agent",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        460
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "row",
+        "operation": "insert",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "<AUDIT_TABLE>"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "matchingColumns": [],
+          "value": {
+            "ticket_id": "={{ $('Code: Build Comment').item.json.id }}",
+            "kind": "equipment_check",
+            "logins": "",
+            "outcome": "={{ $('Code: Build Comment').item.json.status }}",
+            "dry_run": "={{ false }}",
+            "details": "={{ String($('Code: Build Comment').item.json.note || '').slice(0, 300) }}",
+            "at": "={{ $now.toISO() }}",
+            "payload": ""
+          },
+          "schema": [
+            {
+              "id": "ticket_id",
+              "displayName": "ticket_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "kind",
+              "displayName": "kind",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "logins",
+              "displayName": "logins",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "outcome",
+              "displayName": "outcome",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "dry_run",
+              "displayName": "dry_run",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "details",
+              "displayName": "details",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "at",
+              "displayName": "at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "payload",
+              "displayName": "payload",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "16b28b47-b188-531e-9587-a95c97a4eb60",
+      "name": "[Data Table] Log Result",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        1250,
+        460
+      ],
+      "onError": "continueRegularOutput"
+    }
+  ],
+  "connections": {
+    "Every Hour at :30": {
+      "main": [
+        [
+          {
+            "node": "[Redmine] Get Open Leaver Tickets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "[Redmine] Get Open Leaver Tickets": {
+      "main": [
+        [
+          {
+            "node": "Code: Parse Tickets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code: Parse Tickets": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Tickets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Tickets": {
+      "main": [
+        [],
+        [
+          {
+            "node": "[Redmine] Get Ticket History",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "[Redmine] Get Ticket History": {
+      "main": [
+        [
+          {
+            "node": "[GLPI] Open Session",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "[GLPI] Open Session": {
+      "main": [
+        [
+          {
+            "node": "[GLPI] Find User",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "[GLPI] Find User": {
+      "main": [
+        [
+          {
+            "node": "[GLPI] Find Assets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "[GLPI] Find Assets": {
+      "main": [
+        [
+          {
+            "node": "Code: Build Comment",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code: Build Comment": {
+      "main": [
+        [
+          {
+            "node": "Comment Needed?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Comment Needed?": {
+      "main": [
+        [
+          {
+            "node": "[Redmine] Add Comment",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Loop Over Tickets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "[Redmine] Add Comment": {
+      "main": [
+        [
+          {
+            "node": "[Data Table] Log Result",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Loop Over Tickets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When Called by Agent": {
+      "main": [
+        [
+          {
+            "node": "[Redmine] Get Open Leaver Tickets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Europe/Kyiv",
+    "errorWorkflow": "<ERROR_WORKFLOW_ID>",
+    "callerPolicy": "workflowsFromSameOwner"
+  }
+}

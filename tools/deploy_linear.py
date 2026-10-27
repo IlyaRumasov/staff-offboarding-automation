@@ -16,6 +16,7 @@ def main():
     ap.add_argument("--url", required=True)
     ap.add_argument("--key-file", required=True)
     ap.add_argument("--id", required=True)
+    ap.add_argument("--audit-table", default="", help="id Data Table спільного аудиту агента (якщо в живій версії її ще немає)")
     ap.add_argument("--dry", action="store_true", help="лише показати, що буде залито")
     a = ap.parse_args()
     sys.stdout.reconfigure(encoding="utf-8")
@@ -45,12 +46,17 @@ def main():
                 missing.append(f"{n['name']}:{k}")
         if n["type"] == "n8n-nodes-base.googleSheets":
             n["parameters"]["documentId"]["value"] = sheet
+    live_audit = next((n["parameters"]["dataTableId"]["value"] for n in live["nodes"] if n["type"] == "n8n-nodes-base.dataTable"), "")
+    audit = a.audit_table or live_audit
+    for n in new["nodes"]:
+        if n["type"] == "n8n-nodes-base.dataTable" and audit:
+            n["parameters"]["dataTableId"]["value"] = audit
     settings = dict(new["settings"])
     settings["errorWorkflow"] = live["settings"].get("errorWorkflow", "")
     if not settings["errorWorkflow"]:
         settings.pop("errorWorkflow")
     text = json.dumps(new, ensure_ascii=False)
-    left = [p for p in ("<REDMINE_CRED>", "<LDAP_CRED>", "<GW_CRED>", "<SHEETS_CRED>", "<ARCHIVE_SHEET_ID>") if p in text]
+    left = [p for p in ("<REDMINE_CRED>", "<LDAP_CRED>", "<GW_CRED>", "<SHEETS_CRED>", "<ARCHIVE_SHEET_ID>", "<AUDIT_TABLE>") if p in text]
     if missing or left:
         sys.exit(f"не підставлено: {missing} {left}")
     print("nodes:", len(new["nodes"]), "| creds:", sorted({c["name"] for n in new["nodes"] for c in (n.get("credentials") or {}).values()}))

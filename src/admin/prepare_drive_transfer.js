@@ -15,16 +15,9 @@ const issue = t.issue || t;
 const journals = (issue.journals || []).filter(j => j && j.notes);
 const isBot = n => /Автоматичний\s+offboarding/i.test(n);
 
-// Техніка: вирішує останній людський коментар про техніку (старий бот брехав «Заборгованості немає», його не рахуємо).
-// \p{L} з прапорцем u: без нього \w і \b у JS не бачать кирилицю.
-const EQ_OK = /забор\p{L}*\s+по\s+техн\p{L}*\s+нема|техн\p{L}*\s+(повернуто|повернув|повернула|здано|здав|здала)|нічого\s+не\s+числиться/iu;
-const EQ_DEBT = /(закріплен\p{L}*|числиться|не\s+поверну\p{L}*|не\s+здан\p{L}*)[^\r\n]{0,40}(ноут|техн|монітор|комп|пк|телефон|гарнітур|інв)/iu;
-let equipment = 'unknown', equipment_note = '';
-for (const j of journals) {
-  if (isBot(j.notes)) continue;
-  if (EQ_DEBT.test(j.notes)) { equipment = 'debt'; equipment_note = j.notes.trim(); }
-  else if (EQ_OK.test(j.notes)) { equipment = 'ok'; equipment_note = j.notes.trim(); }
-}
+// Техніка: останній коментар про техніку (IT або флоу перевірки техніки в GLPI), див. src/equipment_state.js.
+// @@equipment
+const { equipment, equipment_note } = equipmentState(journals);
 
 // Передача диска: питання бота «Передати диск ... (email)?» і пізніша людська відповідь «так».
 let asked_email = '', confirmed_email = '', drive_done_before = false;
